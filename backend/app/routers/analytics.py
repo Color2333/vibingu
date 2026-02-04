@@ -1,0 +1,257 @@
+"""
+分析 API - Vibing Index 和关联分析
+"""
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, desc
+from typing import List, Optional
+from datetime import date, datetime, timedelta
+from pydantic import BaseModel
+
+from app.database import get_db
+from app.models import LifeStream, DailySummary
+from app.services.vibe_calculator import VibeCalculator
+
+router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+
+class VibeScoreResponse(BaseModel):
+    """Vibing Index 响应"""
+    date: date
+    vibe_score: Optional[int]
+    sleep_score: Optional[int]
+    diet_score: Optional[int]
+    screen_score: Optional[int]
+    activity_score: Optional[int]
+    insights: List[str]
+    record_count: int
+
+
+class TrendDataPoint(BaseModel):
+    """趋势数据点"""
+    date: date
+    vibe_score: Optional[int]
+
+
+class CorrelationResult(BaseModel):
+    """关联分析结果"""
+    factor: str
+    correlation: str
+    description: str
+    data: dict
+
+
+@router.get("/vibe/today", response_model=VibeScoreResponse)
+async def get_today_vibe(db: Session = Depends(get_db)):
+    """获取今天的 Vibing Index"""
+    today = date.today()
+    calculator = VibeCalculator(db)
+    vibe_data = calculator.calculate_daily_vibe(today)
+    
+    # 同时更新 daily_summary
+    calculator.update_daily_summary(today)
+    
+    return VibeScoreResponse(
+        date=today,
+        vibe_score=vibe_data["vibe_score"],
+        sleep_score=vibe_data["sleep_score"],
+        diet_score=vibe_data["diet_score"],
+        screen_score=vibe_data["screen_score"],
+        activity_score=vibe_data["activity_score"],
+        insights=vibe_data["insights"],
+        record_count=vibe_data["record_count"],
+    )
+
+
+@router.get("/vibe/{date_str}", response_model=VibeScoreResponse)
+async def get_vibe_score(
+    date_str: str,
+    db: Session = Depends(get_db),
+):
+    """
+    获取指定日期的 Vibing Index
+    
+    - **date_str**: 日期字符串，格式 YYYY-MM-DD
+    """
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
+    
+    calculator = VibeCalculator(db)
+    vibe_data = calculator.calculate_daily_vibe(target_date)
+    
+    # 同时更新 daily_summary
+    calculator.update_daily_summary(target_date)
+    
+    return VibeScoreResponse(
+        date=target_date,
+        vibe_score=vibe_data["vibe_score"],
+        sleep_score=vibe_data["sleep_score"],
+        diet_score=vibe_data["diet_score"],
+        screen_score=vibe_data["screen_score"],
+        activity_score=vibe_data["activity_score"],
+        insights=vibe_data["insights"],
+        record_count=vibe_data["record_count"],
+    )
+
+
+@router.get("/trend", response_model=List[TrendDataPoint])
+async def get_vibe_trend(
+    days: int = Query(7, ge=1, le=30, description="获取最近多少天的数据"),
+    db: Session = Depends(get_db),
+):
+    """
+    获取最近 N 天的 Vibing Index 趋势
+    """
+    calculator = VibeCalculator(db)
+    trend = []
+    
+    today = date.today()
+    
+    for i in range(days):
+        target_date = today - timedelta(days=i)
+        vibe_data = calculator.calculate_daily_vibe(target_date)
+        trend.append(TrendDataPoint(
+            date=target_date,
+            vibe_score=vibe_data["vibe_score"],
+        ))
+    
+    # 按日期正序返回
+    trend.reverse()
+    return trend
+
+
+@router.get("/correlation", response_model=List[CorrelationResult])
+async def get_correlations(
+    date_str: Optional[str] = Query(None, description="指定日期，默认今天"),
+    db: Session = Depends(get_db),
+):
+    """
+    获取指定日期的关联分析
+    
+    分析当天的行为与状态之间的关联，例如：
+    - 咖啡因摄入 vs 睡眠质量
+    - 屏幕时间 vs 入睡时间
+    """
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="日期格式错误")
+    else:
+        target_date = date.today()
+    
+    # 获取当天所有记录
+    start_time = datetime.combine(target_date, datetime.min.time())
+    end_time = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+    
+    records = db.query(LifeStream).filter(
+        and_(
+            LifeStream.created_at >= start_time,
+            LifeStream.created_at < end_time
+        )
+    ).all()
+    
+    correlations = []
+    
+    # 分析咖啡因摄入
+    diet_records = [r for r in records if r.category == "DIET"]
+    total_caffeine = 0
+    late_caffeine = False
+    
+    for r in diet_records:
+        if r.meta_data:
+            caffeine = r.meta_data.get("caffeine_mg") or r.meta_data.get("caffeine") or 0
+            total_caffeine += float(caffeine)
+            
+            # 检查是否下午2点后摄入咖啡因
+            if r.created_at and r.created_at.hour >= 14 and caffeine > 0:
+                late_caffeine = True
+    
+    if total_caffeine > 0:
+        correlation = "positive" if total_caffeine < 200 else "negative"
+        description = f"今日咖啡因摄入: {total_caffeine}mg"
+        if late_caffeine:
+            description += " (下午2点后有摄入，可能影响睡眠)"
+            correlation = "negative"
+        
+        correlations.append(CorrelationResult(
+            factor="咖啡因",
+            correlation=correlation,
+            description=description,
+            data={"total_mg": total_caffeine, "late_intake": late_caffeine}
+        ))
+    
+    # 分析屏幕时间
+    screen_records = [r for r in records if r.category == "SCREEN"]
+    total_screen_hours = 0
+    
+    for r in screen_records:
+        if r.meta_data:
+            hours = r.meta_data.get("screen_hours") or r.meta_data.get("screen_time") or 0
+            total_screen_hours += float(hours)
+    
+    if total_screen_hours > 0:
+        correlation = "positive" if total_screen_hours < 4 else "negative"
+        description = f"今日屏幕时间: {total_screen_hours:.1f}小时"
+        if total_screen_hours > 6:
+            description += " (超过推荐值，注意用眼健康)"
+        
+        correlations.append(CorrelationResult(
+            factor="屏幕时间",
+            correlation=correlation,
+            description=description,
+            data={"total_hours": total_screen_hours}
+        ))
+    
+    # 分析活动量
+    activity_records = [r for r in records if r.category == "ACTIVITY"]
+    activity_count = len(activity_records)
+    
+    if activity_count > 0:
+        correlations.append(CorrelationResult(
+            factor="运动活动",
+            correlation="positive",
+            description=f"今日活动记录: {activity_count}次",
+            data={"count": activity_count}
+        ))
+    else:
+        correlations.append(CorrelationResult(
+            factor="运动活动",
+            correlation="neutral",
+            description="今天还没有运动记录",
+            data={"count": 0}
+        ))
+    
+    return correlations
+
+
+@router.post("/recalculate")
+async def recalculate_vibe(
+    date_str: Optional[str] = Query(None, description="指定日期，默认今天"),
+    db: Session = Depends(get_db),
+):
+    """
+    重新计算并更新指定日期的 Vibing Index
+    """
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="日期格式错误")
+    else:
+        target_date = date.today()
+    
+    calculator = VibeCalculator(db)
+    summary = calculator.update_daily_summary(target_date)
+    
+    return {
+        "date": target_date.isoformat(),
+        "vibe_score": summary.vibe_score,
+        "message": "已更新"
+    }
