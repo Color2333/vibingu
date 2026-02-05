@@ -1,6 +1,6 @@
 'use client';
 
-import SmartSuggestions from '@/components/SmartSuggestions';
+import AISmartSuggestions from '@/components/AISmartSuggestions';
 import HealthAlerts from '@/components/HealthAlerts';
 import PredictionCard from '@/components/PredictionCard';
 import AnomalyDetector from '@/components/AnomalyDetector';
@@ -17,17 +17,17 @@ export default function InsightsPage({ refreshKey }: InsightsPageProps) {
       {/* 页面标题 */}
       <div>
         <h1 className="text-2xl font-bold text-white">AI 洞察</h1>
-        <p className="text-sm text-white/40 mt-1">基于你的数据提供智能建议</p>
+        <p className="text-sm text-white/40 mt-1">AI 驱动的个性化分析与建议</p>
       </div>
 
-      {/* 健康提醒 - 优先展示 */}
+      {/* AI 智能建议 - 优先展示 */}
       <section className="animate-fade-in">
-        <HealthAlerts key={`alerts-${refreshKey}`} />
+        <AISmartSuggestions key={`ai-suggestions-${refreshKey}`} />
       </section>
 
-      {/* 智能建议 */}
+      {/* 健康提醒 */}
       <section className="animate-fade-in delay-1">
-        <SmartSuggestions key={`suggestions-${refreshKey}`} />
+        <HealthAlerts key={`alerts-${refreshKey}`} />
       </section>
 
       {/* 预测与分析 */}
@@ -45,11 +45,11 @@ export default function InsightsPage({ refreshKey }: InsightsPageProps) {
         <WhatIfSimulator key={`whatif-${refreshKey}`} />
       </section>
 
-      {/* 知识库搜索 */}
+      {/* 知识库搜索 - AI 问答 */}
       <section className="animate-fade-in delay-4 pt-4 border-t border-white/[0.06]">
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-white/80">知识库</h2>
-          <p className="text-xs text-white/40 mt-1">搜索你的历史记录，AI 帮你找答案</p>
+          <h2 className="text-lg font-semibold text-white/80">AI 知识库</h2>
+          <p className="text-xs text-white/40 mt-1">向 AI 提问，基于你的历史数据获取洞察</p>
         </div>
         <KnowledgeSearch key={`knowledge-${refreshKey}`} />
       </section>

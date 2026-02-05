@@ -6,11 +6,14 @@
 import json
 import re
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from openai import AsyncOpenAI
 from app.config import get_settings
 
 settings = get_settings()
+
+# 默认时区（北京时间 UTC+8）
+DEFAULT_TIMEZONE = timezone(timedelta(hours=8))
 
 
 class DataExtractor:
@@ -23,26 +26,29 @@ class DataExtractor:
         self.vision_model = settings.vision_model   # 有图像时用视觉模型
         self.text_model = settings.text_model       # 纯文本用便宜模型
     
-    def _get_current_time(self, client_time: Optional[str] = None) -> str:
-        """获取当前时间字符串"""
+    def _parse_client_time(self, client_time: Optional[str]) -> datetime:
+        """解析客户端时间并转换为本地时间"""
         if client_time:
             try:
+                # ISO 格式时间，例如 "2026-02-05T05:10:00.000Z"
                 dt = datetime.fromisoformat(client_time.replace('Z', '+00:00'))
-                return dt.strftime("%Y年%m月%d日 %H:%M")
-            except:
-                pass
-        return datetime.now().strftime("%Y年%m月%d日 %H:%M")
+                # 转换为本地时区（北京时间）
+                local_dt = dt.astimezone(DEFAULT_TIMEZONE)
+                return local_dt
+            except Exception as e:
+                print(f"时间解析错误: {e}, client_time={client_time}")
+        # 返回当前本地时间
+        return datetime.now(DEFAULT_TIMEZONE)
+    
+    def _get_current_time(self, client_time: Optional[str] = None) -> str:
+        """获取当前时间字符串（本地时间）"""
+        dt = self._parse_client_time(client_time)
+        return dt.strftime("%Y年%m月%d日 %H:%M")
     
     def _get_time_period(self, client_time: Optional[str] = None) -> str:
-        """获取时间段描述"""
-        if client_time:
-            try:
-                dt = datetime.fromisoformat(client_time.replace('Z', '+00:00'))
-                hour = dt.hour
-            except:
-                hour = datetime.now().hour
-        else:
-            hour = datetime.now().hour
+        """获取时间段描述（基于本地时间）"""
+        dt = self._parse_client_time(client_time)
+        hour = dt.hour
         
         if 5 <= hour < 9:
             return "早晨"
@@ -139,7 +145,7 @@ class DataExtractor:
     "suggestions": ["建议1（具体可行）", "建议2（如有必要）"],
     "trend": "up/down/stable（情绪/状态趋势判断）",
     "tags": ["标签1", "标签2", "标签3"],
-    "reply_text": "一句温暖简短的回复（不要说'照片'或'图片'）"
+    "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【禁止】返回'已记录'这种空洞回复。"
 }}"""
 
         return await self._call_ai(system_prompt, None, text, "MOOD")
@@ -171,7 +177,7 @@ class DataExtractor:
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["睡眠", "健康"],
-    "reply_text": "简短回复"
+    "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。"
 }}
 
 注意：只提取可见数据，不可见的设为 null。深度分析和建议基于可见数据给出。"""
@@ -224,7 +230,7 @@ class DataExtractor:
     "trend": "up/down/stable",
     "health_score": 60,
     "tags": ["屏幕时间", "数字健康"],
-    "reply_text": "简短回复，点出关键问题或肯定"
+    "reply_text": "一句有洞察的回复（15-30字），指出屏幕使用的关键问题或肯定健康习惯。【禁止】空洞的'已记录'。"
 }}
 
 注意：
@@ -260,7 +266,7 @@ class DataExtractor:
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["运动", "健身"],
-    "reply_text": "简短鼓励"
+    "reply_text": "一句有力的鼓励（15-30字），肯定运动成果或激励继续保持。【禁止】空洞的'已记录'。"
 }}"""
 
         return await self._call_ai(system_prompt, image_base64, text, "ACTIVITY")
@@ -305,7 +311,7 @@ class DataExtractor:
     "analysis": "营养分析（50-100字）：评估这餐的营养均衡性、热量是否合适、搭配是否健康等",
     "suggestions": ["具体建议1", "具体建议2"],
     "tags": ["饮食", "美食"],
-    "reply_text": "简短评价这餐"
+    "reply_text": "一句有趣的评价（15-30字），点评这餐的营养或美味程度。【禁止】空洞的'已记录'。"
 }}"""
 
         return await self._call_ai(system_prompt, image_base64, text, "DIET")
@@ -351,7 +357,7 @@ class DataExtractor:
     "analysis": "深度分析（30-50字）：从照片推测用户状态、情绪、可能在做什么",
     "suggestions": ["如有需要的建议"],
     "tags": ["标签1", "标签2"],
-    "reply_text": "一句温暖的回复"
+    "reply_text": "一句温暖、有洞察的回复（15-30字），反映照片传递的情绪或给予鼓励。【禁止】空洞的'已记录'。"
 }}"""
 
         result = await self._call_ai(system_prompt, image_base64, text, category_map.get(image_type, "MOOD"))

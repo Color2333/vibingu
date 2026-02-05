@@ -100,13 +100,32 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     thumbnail_path?: string;
     image_path?: string;
   }) => {
+    // 找到临时项，获取原始输入内容
+    let originalContent: string | null = null;
+    const tempId = feedIds.find(id => id.startsWith('temp-'));
+    if (tempId) {
+      const tempItem = feedDataRef.current.get(tempId);
+      originalContent = tempItem?.raw_content || null;
+    }
+    
+    // 判断 ai_insight 是否有意义（不是空洞的"已记录"等）
+    const isGenericInsight = !response.ai_insight || 
+      response.ai_insight === '已记录' || 
+      response.ai_insight === '已记录。' ||
+      response.ai_insight.length < 5;
+    
+    // 如果 AI 没有给出有意义的洞察，使用原始输入
+    const finalInsight = isGenericInsight && originalContent 
+      ? originalContent 
+      : response.ai_insight;
+    
     const realItem: FeedItem = {
       id: response.id,
       input_type: 'TEXT',
       category: response.category,
-      raw_content: null,
+      raw_content: originalContent, // 保留原始内容
       meta_data: response.meta_data,
-      ai_insight: response.ai_insight,
+      ai_insight: finalInsight,
       created_at: response.created_at,
       tags: response.tags,
       image_saved: response.image_saved,
@@ -118,9 +137,9 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     setFeedIds(prev => {
       const tempIdx = prev.findIndex(id => id.startsWith('temp-'));
       if (tempIdx >= 0) {
-        const tempId = prev[tempIdx];
+        const tid = prev[tempIdx];
         // 从 Map 中删除临时项，添加真实项
-        feedDataRef.current.delete(tempId);
+        feedDataRef.current.delete(tid);
         feedDataRef.current.set(response.id, realItem);
         // 返回新的 ID 列表（只替换 ID）
         const newIds = [...prev];
@@ -132,8 +151,10 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
       return [response.id, ...prev];
     });
     
-    showToast('success', response.ai_insight || '记录成功！');
-  }, [showToast]);
+    // Toast 也用有意义的内容
+    const toastMessage = isGenericInsight ? '记录成功！' : response.ai_insight;
+    showToast('success', toastMessage);
+  }, [showToast, feedIds]);
 
   // 处理失败：移除临时记录
   const handleFeedError = useCallback(() => {

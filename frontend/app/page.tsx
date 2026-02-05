@@ -20,8 +20,11 @@ export default function Home() {
 
   const handlePageChange = useCallback((page: PageId) => {
     setCurrentPage(page);
-    // 切换页面时刷新数据
-    setRefreshKey(k => k + 1);
+    // 只在切换到非 record 页面时刷新该页面数据
+    // record 页面保持状态，不刷新（避免丢失正在分析的临时记录）
+    if (page !== 'record') {
+      setRefreshKey(k => k + 1);
+    }
   }, []);
 
   const handleLogout = useCallback(() => {
