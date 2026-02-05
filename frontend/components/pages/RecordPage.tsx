@@ -21,6 +21,7 @@ export interface FeedItem {
   thumbnail_path?: string;
   tags?: string[];
   dimension_scores?: Record<string, number>;
+  is_public?: boolean;
   _pending?: boolean;
   _tempImagePreview?: string;
 }
@@ -167,32 +168,72 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     showToast('error', '记录失败，内容已恢复，点击发送重试');
   }, [showToast]);
 
+  // 删除记录
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/feed/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        feedDataRef.current.delete(id);
+        setFeedIds(prev => prev.filter(i => i !== id));
+        showToast('success', '记录已删除');
+      }
+    } catch {
+      showToast('error', '删除失败');
+    }
+  }, [showToast]);
+
+  // 切换公开状态
+  const handleTogglePublic = useCallback(async (id: string, isPublic: boolean) => {
+    try {
+      const res = await fetch(`/api/feed/${id}/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_public: isPublic }),
+      });
+      if (res.ok) {
+        const item = feedDataRef.current.get(id);
+        if (item) {
+          feedDataRef.current.set(id, { ...item, is_public: isPublic });
+          setFeedIds(prev => [...prev]); // 触发重渲染
+        }
+        showToast('success', isPublic ? '已设为公开' : '已设为私密');
+      }
+    } catch {
+      showToast('error', '操作失败');
+    }
+  }, [showToast]);
+
   // 从 Map 获取 items 列表传给子组件
   const feedItems = feedIds.map(id => feedDataRef.current.get(id)).filter(Boolean) as FeedItem[];
 
   return (
     <div className="flex flex-col h-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">记录</h1>
-        <p className="text-sm text-white/40 mt-1">记录生活的每一个瞬间</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">记录</h1>
+        <p className="text-sm text-[var(--text-tertiary)] mt-1">记录生活的每一个瞬间</p>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-32 -mx-1 px-1">
         {isFirstLoad ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-white/[0.02] rounded-2xl animate-pulse" />
+              <div key={i} className="h-24 bg-[var(--glass-bg)] rounded-2xl animate-pulse" />
             ))}
           </div>
         ) : feedItems.length > 0 ? (
-          <FeedHistory items={feedItems} />
+          <FeedHistory 
+            items={feedItems} 
+            onDelete={handleDelete}
+            onTogglePublic={handleTogglePublic}
+            showManagement={true}
+          />
         ) : (
           <EmptyState />
         )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 md:left-[72px] p-4 pb-6 
-                      bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/95 to-transparent z-30">
+                      bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)]/95 to-transparent z-30">
         <div className="max-w-2xl mx-auto">
           <MagicInputBar 
             onSuccess={handleFeedSuccess} 

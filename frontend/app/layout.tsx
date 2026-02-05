@@ -3,6 +3,7 @@ import './globals.css';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import { ToastProvider } from '@/components/Toast';
 import { AuthProvider } from '@/hooks/useAuth';
+import { ThemeProvider } from '@/hooks/useTheme';
 
 export const metadata: Metadata = {
   title: 'Vibing u - Digitize Your Vibe',
@@ -39,14 +40,16 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans antialiased">
-        <AuthProvider>
-          <ToastProvider>
-            <ServiceWorkerRegistration />
-            <main className="min-h-screen">
-              {children}
-            </main>
-          </ToastProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <ServiceWorkerRegistration />
+              <main className="min-h-screen">
+                {children}
+              </main>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

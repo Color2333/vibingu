@@ -270,8 +270,10 @@ async def get_history(
     - **offset**: 偏移量
     - **category**: 筛选分类
     """
-    # 按提交时间排序（最新提交的在前）
-    query = db.query(LifeStream).order_by(LifeStream.created_at.desc())
+    # 按提交时间排序（最新提交的在前），排除已删除的记录
+    query = db.query(LifeStream).filter(
+        LifeStream.is_deleted != True
+    ).order_by(LifeStream.created_at.desc())
     
     if category:
         query = query.filter(LifeStream.category == category.upper())
@@ -294,6 +296,43 @@ async def get_history(
             "thumbnail_path": f"/api/feed/image/{r.thumbnail_path}" if r.thumbnail_path else None,
             "tags": r.tags,
             "dimension_scores": r.dimension_scores,
+            "is_public": r.is_public or False,
+        }
+        for r in records
+    ]
+
+
+@router.get("/public")
+async def get_public_records(
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """
+    获取公开的记录（无需登录）
+    """
+    query = db.query(LifeStream).filter(
+        LifeStream.is_public == True,
+        LifeStream.is_deleted != True
+    ).order_by(LifeStream.created_at.desc())
+    
+    records = query.offset(offset).limit(limit).all()
+    
+    return [
+        {
+            "id": str(r.id),
+            "input_type": r.input_type,
+            "category": r.category,
+            "raw_content": r.raw_content,
+            "meta_data": r.meta_data,
+            "ai_insight": r.ai_insight,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "record_time": r.record_time.isoformat() if r.record_time else (r.created_at.isoformat() if r.created_at else None),
+            "image_saved": r.image_saved,
+            "image_type": r.image_type,
+            "image_path": f"/api/feed/image/{r.image_path}" if r.image_path else None,
+            "thumbnail_path": f"/api/feed/image/{r.thumbnail_path}" if r.thumbnail_path else None,
+            "tags": r.tags,
         }
         for r in records
     ]
@@ -449,3 +488,52 @@ async def chat_with_record(
             reply="抱歉，AI 服务暂时不可用，请稍后再试。",
             suggestions=None
         )
+
+
+@router.delete("/{record_id}")
+async def delete_record(
+    record_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    删除记录（软删除）
+    
+    - **record_id**: 记录 ID
+    """
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    record.is_deleted = True
+    db.commit()
+    
+    return {"success": True, "message": "记录已删除"}
+
+
+class VisibilityUpdate(BaseModel):
+    """可见性更新请求"""
+    is_public: bool
+
+
+@router.patch("/{record_id}/visibility")
+async def update_visibility(
+    record_id: str,
+    update: VisibilityUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    更新记录可见性
+    
+    - **record_id**: 记录 ID
+    - **is_public**: 是否公开
+    """
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    record.is_public = update.is_public
+    db.commit()
+    
+    return {"success": True, "is_public": record.is_public}

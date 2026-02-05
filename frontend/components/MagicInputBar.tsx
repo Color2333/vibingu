@@ -251,9 +251,9 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           />
           <button
             onClick={clearImage}
-            className="absolute -top-2 -right-2 p-1 bg-white/20 backdrop-blur rounded-full hover:bg-white/30 transition-colors"
+            className="absolute -top-2 -right-2 p-1 bg-[var(--glass-bg)] backdrop-blur rounded-full hover:bg-[var(--bg-secondary)] transition-colors"
           >
-            <X className="w-3 h-3 text-white" />
+            <X className="w-3 h-3 text-[var(--text-primary)]" />
           </button>
         </div>
       )}
@@ -266,7 +266,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder="记录此刻..."
-          className="flex-1 bg-transparent border-none outline-none resize-none text-white/90 placeholder-white/30 text-sm min-h-[40px] max-h-32"
+          className="flex-1 bg-transparent border-none outline-none resize-none text-[var(--text-primary)] placeholder-[var(--text-tertiary)] text-sm min-h-[40px] max-h-32"
           rows={1}
           disabled={isSubmitting}
         />
@@ -281,7 +281,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all btn"
+            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all btn"
             disabled={isSubmitting}
           >
             <ImageIcon className="w-5 h-5" />
@@ -297,7 +297,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           />
           <label
             htmlFor="camera-input"
-            className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all cursor-pointer md:hidden btn"
+            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all cursor-pointer md:hidden btn"
           >
             <Camera className="w-5 h-5" />
           </label>
@@ -307,7 +307,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
             className={`p-2 rounded-lg transition-all btn ${
               isRecording
                 ? 'text-red-400 bg-red-500/10'
-                : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]'
             }`}
             disabled={isSubmitting}
           >
@@ -317,7 +317,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || (!text.trim() && !image)}
-            className="p-2 rounded-lg bg-[#6366f1] text-white hover:bg-[#5558e3] transition-all btn disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-all btn disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />

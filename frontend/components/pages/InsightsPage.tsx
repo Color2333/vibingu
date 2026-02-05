@@ -17,8 +17,8 @@ export default function InsightsPage({ refreshKey }: InsightsPageProps) {
     <div className="space-y-6 pb-8">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-bold text-white">AI 洞察</h1>
-        <p className="text-sm text-white/40 mt-1">AI 驱动的个性化分析与建议</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">AI 洞察</h1>
+        <p className="text-sm text-[var(--text-tertiary)] mt-1">AI 驱动的个性化分析与建议</p>
       </div>
 
       {/* AI 对话助手 - 新增 */}
@@ -52,10 +52,10 @@ export default function InsightsPage({ refreshKey }: InsightsPageProps) {
       </section>
 
       {/* 知识库搜索 - 高级搜索 */}
-      <section className="animate-fade-in delay-5 pt-4 border-t border-white/[0.06]">
+      <section className="animate-fade-in delay-5 pt-4 border-t border-[var(--border)]">
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-white/80">知识库搜索</h2>
-          <p className="text-xs text-white/40 mt-1">语义搜索、相似日查找</p>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">知识库搜索</h2>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1">语义搜索、相似日查找</p>
         </div>
         <KnowledgeSearch key={`knowledge-${refreshKey}`} />
       </section>

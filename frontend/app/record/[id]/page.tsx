@@ -159,7 +159,7 @@ export default function RecordDetailPage() {
       <div className="min-h-screen gradient-mesh flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
-          <div className="text-white/40 text-sm">加载中...</div>
+          <div className="text-[var(--text-tertiary)] text-sm">加载中...</div>
         </div>
       </div>
     );
@@ -169,7 +169,7 @@ export default function RecordDetailPage() {
     return (
       <div className="min-h-screen gradient-mesh flex items-center justify-center">
         <div className="text-center">
-          <p className="text-white/60 mb-4">{error || '记录不存在'}</p>
+          <p className="text-[var(--text-secondary)] mb-4">{error || '记录不存在'}</p>
           <button
             onClick={() => router.push('/')}
             className="px-4 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors"
@@ -200,17 +200,17 @@ export default function RecordDetailPage() {
   return (
     <div className="min-h-screen gradient-mesh">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-black/20 backdrop-blur-xl border-b border-white/5">
+      <header className="sticky top-0 z-40 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border)]">
         <div className="container mx-auto px-4 py-4 max-w-4xl">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.back()}
-              className="p-2 -ml-2 text-white/60 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              className="p-2 -ml-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <h1 className="text-lg font-semibold text-white/90 flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                 <span className={config.color}>{config.icon}</span>
                 {config.label}记录详情
               </h1>
@@ -223,7 +223,7 @@ export default function RecordDetailPage() {
         {/* Record Content */}
         <div className="glass-card p-6 mb-6">
           {/* Time */}
-          <div className="flex items-center gap-2 text-sm text-white/40 mb-4">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mb-4">
             <Clock className="w-4 h-4" />
             <span>{(record.record_time || record.created_at) ? formatDateTime(record.record_time || record.created_at!) : '未知时间'}</span>
             {score !== undefined && (
@@ -256,14 +256,14 @@ export default function RecordDetailPage() {
               
               {/* 入睡和苏醒时间 */}
               <div className="grid grid-cols-2 gap-4 mb-3">
-                <div className="text-center p-3 rounded-lg bg-white/[0.02]">
-                  <div className="text-[10px] text-white/30 mb-1">入睡时间</div>
+                <div className="text-center p-3 rounded-lg bg-[var(--glass-bg)]">
+                  <div className="text-[10px] text-[var(--text-tertiary)] mb-1">入睡时间</div>
                   <div className="text-lg font-semibold text-indigo-300">
                     {sleepTime || '--:--'}
                   </div>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-white/[0.02]">
-                  <div className="text-[10px] text-white/30 mb-1">苏醒时间</div>
+                <div className="text-center p-3 rounded-lg bg-[var(--glass-bg)]">
+                  <div className="text-[10px] text-[var(--text-tertiary)] mb-1">苏醒时间</div>
                   <div className="text-lg font-semibold text-amber-300">
                     {wakeTime || '--:--'}
                   </div>
@@ -273,26 +273,26 @@ export default function RecordDetailPage() {
               {/* 睡眠时长和构成 */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 {durationHours && (
-                  <div className="p-2 rounded-lg bg-white/[0.02]">
-                    <div className="text-[10px] text-white/30">总时长</div>
-                    <div className="text-sm font-medium text-white/80">{durationHours.toFixed(1)}h</div>
+                  <div className="p-2 rounded-lg bg-[var(--glass-bg)]">
+                    <div className="text-[10px] text-[var(--text-tertiary)]">总时长</div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">{durationHours.toFixed(1)}h</div>
                   </div>
                 )}
                 {deepSleepHours && (
-                  <div className="p-2 rounded-lg bg-white/[0.02]">
-                    <div className="text-[10px] text-white/30">深睡</div>
+                  <div className="p-2 rounded-lg bg-[var(--glass-bg)]">
+                    <div className="text-[10px] text-[var(--text-tertiary)]">深睡</div>
                     <div className="text-sm font-medium text-indigo-300">{deepSleepHours.toFixed(1)}h</div>
                   </div>
                 )}
                 {remHours && (
-                  <div className="p-2 rounded-lg bg-white/[0.02]">
-                    <div className="text-[10px] text-white/30">REM</div>
+                  <div className="p-2 rounded-lg bg-[var(--glass-bg)]">
+                    <div className="text-[10px] text-[var(--text-tertiary)]">REM</div>
                     <div className="text-sm font-medium text-purple-300">{remHours.toFixed(1)}h</div>
                   </div>
                 )}
                 {lightSleepHours && (
-                  <div className="p-2 rounded-lg bg-white/[0.02]">
-                    <div className="text-[10px] text-white/30">浅睡</div>
+                  <div className="p-2 rounded-lg bg-[var(--glass-bg)]">
+                    <div className="text-[10px] text-[var(--text-tertiary)]">浅睡</div>
                     <div className="text-sm font-medium text-blue-300">{lightSleepHours.toFixed(1)}h</div>
                   </div>
                 )}
@@ -303,10 +303,10 @@ export default function RecordDetailPage() {
           {/* Original Content */}
           {record.raw_content && !record.raw_content.startsWith('/') && !record.raw_content.includes('/Users/') && (
             <div className="mb-4">
-              <h3 className="text-xs text-white/30 mb-2 flex items-center gap-1">
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
                 <span>原始内容</span>
               </h3>
-              <p className="text-white/90 leading-relaxed whitespace-pre-wrap">
+              <p className="text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
                 {record.raw_content}
               </p>
             </div>
@@ -319,7 +319,7 @@ export default function RecordDetailPage() {
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>AI 洞察</span>
               </h3>
-              <p className="text-white/70 leading-relaxed">
+              <p className="text-[var(--text-secondary)] leading-relaxed">
                 {record.ai_insight}
               </p>
             </div>
@@ -327,12 +327,12 @@ export default function RecordDetailPage() {
 
           {/* AI Analysis */}
           {analysis && (
-            <div className="mb-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <h3 className="text-xs text-white/40 mb-2 flex items-center gap-1">
+            <div className="mb-4 p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)]">
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5" />
                 <span>AI 深度分析</span>
               </h3>
-              <p className="text-white/60 leading-relaxed whitespace-pre-wrap">
+              <p className="text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
                 {analysis}
               </p>
             </div>
@@ -341,10 +341,10 @@ export default function RecordDetailPage() {
           {/* Suggestions */}
           {metaSuggestions && metaSuggestions.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-xs text-white/40 mb-2">💡 建议</h3>
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-2">💡 建议</h3>
               <div className="space-y-2">
                 {metaSuggestions.map((s, idx) => (
-                  <p key={idx} className="text-white/50 text-sm flex items-start gap-2">
+                  <p key={idx} className="text-[var(--text-secondary)] text-sm flex items-start gap-2">
                     <span className="text-amber-400">•</span>
                     <span>{s}</span>
                   </p>
@@ -378,7 +378,7 @@ export default function RecordDetailPage() {
               {record.tags.map((tag, idx) => (
                 <span 
                   key={idx} 
-                  className="px-2 py-1 text-xs rounded-lg bg-white/[0.04] text-white/40"
+                  className="px-2 py-1 text-xs rounded-lg bg-[var(--glass-bg)] text-[var(--text-tertiary)]"
                 >
                   {tag}
                 </span>
@@ -388,13 +388,13 @@ export default function RecordDetailPage() {
 
           {/* Dimension Scores */}
           {record.dimension_scores && Object.keys(record.dimension_scores).length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <h3 className="text-xs text-white/30 mb-3">维度评分</h3>
+            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-3">维度评分</h3>
               <div className="grid grid-cols-4 gap-2">
                 {Object.entries(record.dimension_scores).map(([key, value]) => (
                   <div key={key} className="text-center">
-                    <div className="text-lg font-semibold text-white/80">{value}</div>
-                    <div className="text-[10px] text-white/30">{key}</div>
+                    <div className="text-lg font-semibold text-[var(--text-primary)]">{value}</div>
+                    <div className="text-[10px] text-[var(--text-tertiary)]">{key}</div>
                   </div>
                 ))}
               </div>
@@ -404,25 +404,25 @@ export default function RecordDetailPage() {
 
         {/* Chat Section */}
         <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-white/5">
-            <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+          <div className="p-4 border-b border-[var(--border)]">
+            <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-violet-400" />
               与 AI 讨论这条记录
             </h3>
-            <p className="text-xs text-white/30 mt-1">问我任何关于这条记录的问题</p>
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">问我任何关于这条记录的问题</p>
           </div>
 
           {/* Messages */}
           <div className="h-[300px] overflow-y-auto p-4 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-white/30 text-sm mb-4">选择一个问题开始对话</p>
+                <p className="text-[var(--text-tertiary)] text-sm mb-4">选择一个问题开始对话</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {suggestions.map((s, idx) => (
                     <button
                       key={idx}
                       onClick={() => sendMessage(s)}
-                      className="px-3 py-1.5 text-xs bg-white/5 text-white/50 rounded-full hover:bg-white/10 hover:text-white/70 transition-colors"
+                      className="px-3 py-1.5 text-xs bg-[var(--glass-bg)] text-[var(--text-secondary)] rounded-full hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-colors"
                     >
                       {s}
                     </button>
@@ -438,8 +438,8 @@ export default function RecordDetailPage() {
                   >
                     <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${
                       msg.role === 'user' 
-                        ? 'bg-indigo-500/20 text-white/90' 
-                        : 'bg-white/5 text-white/70'
+                        ? 'bg-indigo-500/20 text-[var(--text-primary)]' 
+                        : 'bg-[var(--glass-bg)] text-[var(--text-secondary)]'
                     }`}>
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>
@@ -447,11 +447,11 @@ export default function RecordDetailPage() {
                 ))}
                 {isSending && (
                   <div className="flex justify-start">
-                    <div className="bg-white/5 px-4 py-2 rounded-2xl">
+                    <div className="bg-[var(--glass-bg)] px-4 py-2 rounded-2xl">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce" />
-                        <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                        <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        <div className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce" />
+                        <div className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <div className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                       </div>
                     </div>
                   </div>
@@ -463,13 +463,13 @@ export default function RecordDetailPage() {
 
           {/* Quick Suggestions (when in conversation) */}
           {messages.length > 0 && suggestions.length > 0 && (
-            <div className="px-4 py-2 border-t border-white/5 flex gap-2 overflow-x-auto">
+            <div className="px-4 py-2 border-t border-[var(--border)] flex gap-2 overflow-x-auto">
               {suggestions.map((s, idx) => (
                 <button
                   key={idx}
                   onClick={() => sendMessage(s)}
                   disabled={isSending}
-                  className="px-3 py-1 text-xs bg-white/5 text-white/40 rounded-full hover:bg-white/10 hover:text-white/60 transition-colors whitespace-nowrap flex-shrink-0"
+                  className="px-3 py-1 text-xs bg-[var(--glass-bg)] text-[var(--text-tertiary)] rounded-full hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)] transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   {s}
                 </button>
@@ -478,7 +478,7 @@ export default function RecordDetailPage() {
           )}
 
           {/* Input */}
-          <div className="p-4 border-t border-white/5">
+          <div className="p-4 border-t border-[var(--border)]">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -486,7 +486,7 @@ export default function RecordDetailPage() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="输入你的问题..."
-                className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 text-sm"
+                className="flex-1 px-4 py-2 bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] text-sm"
               />
               <button
                 onClick={() => sendMessage(inputValue)}

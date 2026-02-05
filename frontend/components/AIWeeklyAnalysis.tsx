@@ -153,11 +153,11 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       <div className={`glass-card p-6 ${className}`}>
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 周度分析</h3>
         </div>
         <div className="text-center py-8">
           <div className="text-4xl mb-3">📊</div>
-          <p className="text-white/50 mb-4">点击生成本周 AI 分析报告</p>
+          <p className="text-[var(--text-secondary)] mb-4">点击生成本周 AI 分析报告</p>
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -186,12 +186,12 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       <div className={`glass-card p-6 ${className}`}>
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 周度分析</h3>
         </div>
         <div className="text-center py-8">
           <RefreshCw className="w-8 h-8 text-violet-400 animate-spin mx-auto mb-3" />
-          <p className="text-white/50">正在生成分析...</p>
-          <p className="text-xs text-white/30 mt-1">AI 正在分析你的生活数据</p>
+          <p className="text-[var(--text-secondary)]">正在生成分析...</p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1">AI 正在分析你的生活数据</p>
         </div>
       </div>
     );
@@ -203,12 +203,12 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       <div className={`glass-card p-6 ${className}`}>
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 周度分析</h3>
         </div>
         <div className="text-center py-8">
           <div className="text-4xl mb-3">😅</div>
-          <p className="text-white/60 mb-2">生成失败</p>
-          <p className="text-xs text-white/40 mb-4">可能是网络问题或 AI 服务繁忙</p>
+          <p className="text-[var(--text-secondary)] mb-2">生成失败</p>
+          <p className="text-xs text-[var(--text-tertiary)] mb-4">可能是网络问题或 AI 服务繁忙</p>
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -229,12 +229,12 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       <div className={`glass-card p-6 ${className}`}>
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 周度分析</h3>
         </div>
         <div className="text-center py-8">
           <div className="text-4xl mb-3">📊</div>
-          <p className="text-white/60">暂无足够数据进行分析</p>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-[var(--text-secondary)]">暂无足够数据进行分析</p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1">
             记录更多生活数据，AI 将为你生成洞察
           </p>
         </div>
@@ -252,7 +252,7 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
     ? 'text-emerald-400'
     : data.mood_trend === 'down'
     ? 'text-red-400'
-    : 'text-white/50';
+    : 'text-[var(--text-tertiary)]';
 
   return (
     <div className={`glass-card p-6 ${className}`}>
@@ -260,9 +260,9 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 周度分析</h3>
           {lastUpdated && (
-            <span className="text-[10px] text-white/30 flex items-center gap-1">
+            <span className="text-[10px] text-[var(--text-tertiary)] flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatLastUpdated()}
             </span>
@@ -271,7 +271,7 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-colors"
+          className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
           title="重新生成分析"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -281,18 +281,18 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       {/* 总结 & 分数 */}
       <div className="flex items-center gap-4 mb-6 p-4 rounded-xl bg-gradient-to-r from-violet-500/10 to-indigo-500/10 border border-violet-500/20">
         {data.overall_score !== undefined && (
-          <div className="text-center px-4 border-r border-white/10">
+          <div className="text-center px-4 border-r border-[var(--border)]">
             <div className={`text-3xl font-bold ${
               data.overall_score >= 70 ? 'text-emerald-400' :
               data.overall_score >= 50 ? 'text-amber-400' : 'text-red-400'
             }`}>
               {data.overall_score}
             </div>
-            <div className="text-xs text-white/40">综合评分</div>
+            <div className="text-xs text-[var(--text-tertiary)]">综合评分</div>
           </div>
         )}
         <div className="flex-1">
-          <p className="text-white/80 leading-relaxed">{data.summary}</p>
+          <p className="text-[var(--text-primary)] leading-relaxed">{data.summary}</p>
           {data.mood_trend && (
             <div className="flex items-center gap-1.5 mt-2">
               <TrendIcon className={`w-4 h-4 ${trendColor}`} />
@@ -316,7 +316,7 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
               </div>
               <ul className="space-y-1">
                 {data.highlights.map((h, idx) => (
-                  <li key={idx} className="text-sm text-white/60">• {h}</li>
+                  <li key={idx} className="text-sm text-[var(--text-secondary)]">• {h}</li>
                 ))}
               </ul>
             </div>
@@ -330,7 +330,7 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
               </div>
               <ul className="space-y-1">
                 {data.concerns.map((c, idx) => (
-                  <li key={idx} className="text-sm text-white/60">• {c}</li>
+                  <li key={idx} className="text-sm text-[var(--text-secondary)]">• {c}</li>
                 ))}
               </ul>
             </div>
@@ -341,18 +341,18 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       {/* AI 洞察 */}
       {data.insights && data.insights.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-white/60 mb-3">AI 洞察</h4>
+          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">AI 洞察</h4>
           <div className="space-y-3">
             {data.insights.map((insight, idx) => (
               <div 
                 key={idx} 
-                className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]"
+                className="p-3 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)]"
               >
                 <div className="flex items-start gap-3">
                   <span className="text-xl">{insight.emoji}</span>
                   <div>
-                    <p className="text-sm font-medium text-white/80">{insight.title}</p>
-                    <p className="text-sm text-white/50 mt-1">{insight.content}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{insight.title}</p>
+                    <p className="text-sm text-[var(--text-secondary)] mt-1">{insight.content}</p>
                   </div>
                 </div>
               </div>
@@ -364,7 +364,7 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
       {/* 建议 */}
       {data.suggestions && data.suggestions.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-white/60 mb-3 flex items-center gap-2">
+          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3 flex items-center gap-2">
             <Lightbulb className="w-4 h-4 text-amber-400" />
             AI 建议
           </h4>

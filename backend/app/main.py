@@ -37,6 +37,16 @@ def run_migrations():
             cursor.execute("ALTER TABLE life_stream ADD COLUMN record_time DATETIME")
             print("✅ 自动迁移: 添加 record_time 列")
         
+        # 添加 is_public 列（v0.4）
+        if "is_public" not in columns:
+            cursor.execute("ALTER TABLE life_stream ADD COLUMN is_public BOOLEAN DEFAULT 0")
+            print("✅ 自动迁移: 添加 is_public 列")
+        
+        # 添加 is_deleted 列（v0.4）
+        if "is_deleted" not in columns:
+            cursor.execute("ALTER TABLE life_stream ADD COLUMN is_deleted BOOLEAN DEFAULT 0")
+            print("✅ 自动迁移: 添加 is_deleted 列")
+        
         conn.commit()
         conn.close()
     except Exception as e:

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (password: string) => Promise<boolean>;
+  onBack?: () => void;
 }
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,13 +31,24 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
   return (
     <div className="min-h-screen gradient-mesh flex items-center justify-center p-4">
+      {/* 返回按钮 */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors flex items-center gap-2"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm">返回</span>
+        </button>
+      )}
+      
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl glass mb-4">
-            <Lock className="w-7 h-7 text-white/60" />
+            <Lock className="w-7 h-7 text-[var(--text-secondary)]" />
           </div>
           <h1 className="text-2xl font-light gradient-text mb-2">vibing u</h1>
-          <p className="text-sm text-white/40">请输入密码进入</p>
+          <p className="text-sm text-[var(--text-tertiary)]">请输入密码进入私密空间</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-6">
@@ -45,7 +57,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="密码"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors mb-4"
+            className="w-full bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-colors mb-4"
             autoFocus
           />
 
@@ -56,7 +68,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           <button
             type="submit"
             disabled={isLoading || !password.trim()}
-            className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#5558e3] text-white rounded-xl px-4 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:opacity-90 text-white rounded-xl px-4 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -69,7 +81,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </button>
         </form>
 
-        <p className="text-center text-white/20 text-xs mt-6">
+        <p className="text-center text-[var(--text-tertiary)] opacity-60 text-xs mt-6">
           个人生活数据面板
         </p>
       </div>

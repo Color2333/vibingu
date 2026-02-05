@@ -120,10 +120,10 @@ export default function ChatAssistant() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button - 位置调高避免遮挡输入框 */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 shadow-lg hover:shadow-xl transition-all z-40 flex items-center justify-center ${
+        className={`fixed bottom-28 right-6 w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 shadow-lg hover:shadow-xl transition-all z-40 flex items-center justify-center ${
           isOpen ? 'scale-0' : 'scale-100'
         }`}
       >
@@ -139,16 +139,16 @@ export default function ChatAssistant() {
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />
-            <span className="font-semibold text-white/90">AI 助手</span>
+            <span className="font-semibold text-[var(--text-primary)]">AI 助手</span>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg hover:bg-[var(--glass-bg)] transition-colors"
           >
-            <X className="w-5 h-5 text-white/60" />
+            <X className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
         </div>
 
@@ -164,12 +164,12 @@ export default function ChatAssistant() {
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   msg.role === 'user'
-                    ? 'bg-gradient-to-r from-purple-500/30 to-cyan-500/30 text-white'
-                    : 'bg-white/5 text-white/80'
+                    ? 'bg-gradient-to-r from-purple-500/30 to-cyan-500/30 text-[var(--text-primary)]'
+                    : 'bg-[var(--glass-bg)] text-[var(--text-secondary)]'
                 }`}
               >
                 {msg.type === 'markdown' ? (
-                  <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
                     <ReactMarkdown
                       components={{
                         p: ({ children }) => (
@@ -182,7 +182,7 @@ export default function ChatAssistant() {
                           <li className="mb-1">{children}</li>
                         ),
                         strong: ({ children }) => (
-                          <strong className="text-white font-semibold">
+                          <strong className="text-[var(--text-primary)] font-semibold">
                             {children}
                           </strong>
                         ),
@@ -200,15 +200,15 @@ export default function ChatAssistant() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white/5 rounded-2xl px-4 py-3">
+              <div className="bg-[var(--glass-bg)] rounded-2xl px-4 py-3">
                 <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce" />
                   <div
-                    className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce"
                     style={{ animationDelay: '0.1s' }}
                   />
                   <div
-                    className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce"
                     style={{ animationDelay: '0.2s' }}
                   />
                 </div>
@@ -227,7 +227,7 @@ export default function ChatAssistant() {
                 <button
                   key={idx}
                   onClick={() => sendMessage(s.text)}
-                  className="px-3 py-1.5 text-xs rounded-full bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
+                  className="px-3 py-1.5 text-xs rounded-full bg-[var(--glass-bg)] hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] transition-colors"
                 >
                   {s.icon} {s.text}
                 </button>
@@ -237,7 +237,7 @@ export default function ChatAssistant() {
         )}
 
         {/* Input */}
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-[var(--border)]">
           <div className="flex gap-2">
             <input
               type="text"
@@ -245,14 +245,14 @@ export default function ChatAssistant() {
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="问我任何关于你生活数据的问题..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50"
+              className="flex-1 bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-purple-500/50"
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
-              className="p-2 rounded-xl bg-gradient-to-r from-purple-500/30 to-cyan-500/30 border border-white/10 hover:border-purple-500/30 disabled:opacity-50 transition-all"
+              className="p-2 rounded-xl bg-gradient-to-r from-purple-500/30 to-cyan-500/30 border border-[var(--border)] hover:border-purple-500/30 disabled:opacity-50 transition-all"
             >
-              <Send className="w-5 h-5 text-white/80" />
+              <Send className="w-5 h-5 text-[var(--text-primary)]" />
             </button>
           </div>
         </div>

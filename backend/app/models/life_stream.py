@@ -82,5 +82,9 @@ class LifeStream(Base):
     # 八维度得分 (0-100)
     dimension_scores = Column(JSONType, nullable=True, comment="维度得分")
     
+    # 可见性与删除状态
+    is_public = Column(Boolean, default=False, comment="是否公开可见")
+    is_deleted = Column(Boolean, default=False, comment="是否已删除（软删除）")
+    
     def __repr__(self):
         return f"<LifeStream(id={self.id}, category={self.category}, created_at={self.created_at})>"

@@ -112,10 +112,10 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
     return (
       <div className={`glass-card p-4 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-5 bg-white/10 rounded w-1/3 mb-3"></div>
+          <div className="h-5 bg-[var(--glass-bg)] rounded w-1/3 mb-3"></div>
           <div className="grid grid-cols-3 gap-3">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-20 bg-white/5 rounded-lg"></div>
+              <div key={i} className="h-20 bg-[var(--glass-bg)] rounded-lg"></div>
             ))}
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-medium text-white/80">AI 用量统计</h3>
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">AI 用量统计</h3>
           {trendDirection === 'up' && (
             <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded">
               ↑ 上升
@@ -154,9 +154,9 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
         </div>
         <button
           onClick={fetchUsage}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--glass-bg)] transition-colors"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-white/40" />
+          <RefreshCw className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
         </button>
       </div>
 
@@ -175,22 +175,22 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
         {periods.map(({ label, data, icon }) => (
           <div
             key={label}
-            className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+            className="p-3 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--bg-secondary)] transition-colors"
           >
             <div className="flex items-center gap-1 mb-2">
               <span className="text-sm">{icon}</span>
-              <span className="text-xs text-white/50">{label}</span>
+              <span className="text-xs text-[var(--text-tertiary)]">{label}</span>
             </div>
             <div className="space-y-1.5">
               <div>
-                <div className="text-lg font-semibold text-white/90">
+                <div className="text-lg font-semibold text-[var(--text-primary)]">
                   {formatTokens(data.tokens)}
                 </div>
-                <div className="text-[10px] text-white/40">tokens</div>
+                <div className="text-[10px] text-[var(--text-tertiary)]">tokens</div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-emerald-400">{formatCost(data.cost)}</span>
-                <span className="text-xs text-white/40">{data.requests} 次</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{data.requests} 次</span>
               </div>
             </div>
           </div>
@@ -201,8 +201,8 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
       {trend.length > 0 && (
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-xs text-white/50">近14天用量趋势</span>
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+            <span className="text-xs text-[var(--text-tertiary)]">近14天用量趋势</span>
           </div>
           <div className="flex items-end gap-1 h-12">
             {trend.slice(-14).map((d, i) => (
@@ -217,10 +217,10 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
             ))}
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-[10px] text-white/30">
+            <span className="text-[10px] text-[var(--text-tertiary)] opacity-60">
               {trend[0]?.date?.slice(5)}
             </span>
-            <span className="text-[10px] text-white/30">
+            <span className="text-[10px] text-[var(--text-tertiary)] opacity-60">
               {trend[trend.length - 1]?.date?.slice(5)}
             </span>
           </div>
@@ -230,19 +230,19 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
       {/* 展开详情按钮 */}
       <button
         onClick={() => setShowDetails(!showDetails)}
-        className="w-full py-2 text-xs text-white/50 hover:text-white/70 transition-colors"
+        className="w-full py-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
       >
         {showDetails ? '收起详情 ▲' : '查看详情 ▼'}
       </button>
 
       {/* 详情面板 */}
       {showDetails && (
-        <div className="mt-3 pt-3 border-t border-white/10 space-y-4">
+        <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-4">
           {/* 模型使用分布 */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <PieChart className="w-3.5 h-3.5 text-white/40" />
-              <span className="text-xs text-white/50">模型使用分布</span>
+              <PieChart className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+              <span className="text-xs text-[var(--text-tertiary)]">模型使用分布</span>
             </div>
             <div className="space-y-2">
               {Object.entries(modelUsage).map(([type, data]) => {
@@ -252,14 +252,14 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
                 return (
                   <div key={type}>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-white/60">
+                      <span className="text-[var(--text-secondary)]">
                         {modelTypeLabels[type] || type}
                       </span>
-                      <span className="text-white/40">
+                      <span className="text-[var(--text-tertiary)]">
                         {formatTokens(data.tokens)} ({percentage.toFixed(0)}%)
                       </span>
                     </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[var(--glass-bg)] rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
                           type === 'vision'
@@ -280,12 +280,12 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
           </div>
 
           {/* 成本明细 */}
-          <div className="p-3 rounded-lg bg-white/5">
-            <div className="text-xs text-white/50 mb-2">本月成本明细</div>
+          <div className="p-3 rounded-lg bg-[var(--glass-bg)]">
+            <div className="text-xs text-[var(--text-tertiary)] mb-2">本月成本明细</div>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(modelUsage).map(([type, data]) => (
                 <div key={type} className="flex justify-between items-center">
-                  <span className="text-xs text-white/60">
+                  <span className="text-xs text-[var(--text-secondary)]">
                     {modelTypeLabels[type] || type}
                   </span>
                   <span className="text-xs text-emerald-400">

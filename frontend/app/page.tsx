@@ -8,6 +8,7 @@ import InsightsPage from '@/components/pages/InsightsPage';
 import AchievementsPage from '@/components/pages/AchievementsPage';
 import SettingsPage from '@/components/pages/SettingsPage';
 import LoginScreen from '@/components/LoginScreen';
+import PublicFeedPage from '@/components/pages/PublicFeedPage';
 import ChatAssistant from '@/components/ChatAssistant';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 export default function Home() {
   const [currentPage, setCurrentPage] = useState<PageId>('record');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showLogin, setShowLogin] = useState(false);
   const { showToast } = useToast();
   const { isAuthenticated, isLoading: authLoading, login, logout } = useAuth();
 
@@ -29,8 +31,17 @@ export default function Home() {
 
   const handleLogout = useCallback(() => {
     logout();
+    setShowLogin(false);
     showToast('info', '已退出登录');
   }, [logout, showToast]);
+
+  const handleLogin = useCallback(async (password: string) => {
+    const success = await login(password);
+    if (success) {
+      setShowLogin(false);
+    }
+    return success;
+  }, [login]);
 
   // 认证检查
   if (authLoading) {
@@ -38,14 +49,18 @@ export default function Home() {
       <div className="min-h-screen gradient-mesh flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
-          <div className="text-white/40 text-sm">加载中...</div>
+          <div className="text-[var(--text-tertiary)] text-sm">加载中...</div>
         </div>
       </div>
     );
   }
 
+  // 未登录：显示公开页面或登录界面
   if (!isAuthenticated) {
-    return <LoginScreen onLogin={login} />;
+    if (showLogin) {
+      return <LoginScreen onLogin={handleLogin} onBack={() => setShowLogin(false)} />;
+    }
+    return <PublicFeedPage onEnterPrivate={() => setShowLogin(true)} />;
   }
 
   // 渲染当前页面
