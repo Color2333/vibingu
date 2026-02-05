@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from pathlib import Path
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,31 @@ class Settings(BaseSettings):
     
     # Server
     debug: bool = True
+    
+    # CORS Origins (comma-separated string for Docker)
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    
+    # ChromaDB
+    chroma_persist_dir: str = ""
+    
+    # Upload directory
+    upload_dir: str = ""
+    
+    def get_cors_origins(self) -> List[str]:
+        """获取 CORS origins 列表"""
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+    
+    def get_chroma_persist_dir(self) -> str:
+        """获取 ChromaDB 持久化目录"""
+        if self.chroma_persist_dir:
+            return self.chroma_persist_dir
+        return str(Path(__file__).parent.parent / "chroma_db")
+    
+    def get_upload_dir(self) -> str:
+        """获取上传目录"""
+        if self.upload_dir:
+            return self.upload_dir
+        return str(Path(__file__).parent.parent / "uploads")
     
     def get_database_url(self) -> str:
         """获取数据库 URL，优先使用环境变量，否则使用 SQLite"""

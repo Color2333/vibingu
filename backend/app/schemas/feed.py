@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 
@@ -22,6 +22,10 @@ class FeedResponse(BaseModel):
     image_saved: bool = False
     image_path: Optional[str] = None
     thumbnail_path: Optional[str] = None
+    
+    # v0.2 新增: 智能标签和维度分析
+    tags: Optional[List[str]] = None
+    dimension_scores: Optional[Dict[str, float]] = None
     
     class Config:
         from_attributes = True

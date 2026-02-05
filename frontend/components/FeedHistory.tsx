@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Moon, Utensils, Smartphone, Activity, Smile, Clock, ChevronDown, Image as ImageIcon, X } from 'lucide-react';
+import { Moon, Utensils, Smartphone, Activity, Smile, Clock, ChevronDown, Image as ImageIcon, X, Users, Briefcase, BookOpen, Gamepad2 } from 'lucide-react';
 
 interface FeedItem {
   id: string;
@@ -15,6 +15,8 @@ interface FeedItem {
   image_type?: string;
   image_path?: string;
   thumbnail_path?: string;
+  tags?: string[];
+  dimension_scores?: Record<string, number>;
 }
 
 interface FeedHistoryProps {
@@ -22,12 +24,17 @@ interface FeedHistoryProps {
   isLoading: boolean;
 }
 
-const categoryConfig: Record<string, { icon: React.ReactNode; color: string }> = {
-  SLEEP: { icon: <Moon className="w-4 h-4" />, color: 'text-indigo-400' },
-  DIET: { icon: <Utensils className="w-4 h-4" />, color: 'text-orange-400' },
-  SCREEN: { icon: <Smartphone className="w-4 h-4" />, color: 'text-blue-400' },
-  ACTIVITY: { icon: <Activity className="w-4 h-4" />, color: 'text-green-400' },
-  MOOD: { icon: <Smile className="w-4 h-4" />, color: 'text-pink-400' },
+// v0.2: 更新分类配置 - 八维度模型
+const categoryConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+  SLEEP: { icon: <Moon className="w-4 h-4" />, color: 'text-indigo-400', label: '睡眠' },
+  DIET: { icon: <Utensils className="w-4 h-4" />, color: 'text-orange-400', label: '饮食' },
+  SCREEN: { icon: <Smartphone className="w-4 h-4" />, color: 'text-blue-400', label: '屏幕' },
+  ACTIVITY: { icon: <Activity className="w-4 h-4" />, color: 'text-green-400', label: '运动' },
+  MOOD: { icon: <Smile className="w-4 h-4" />, color: 'text-pink-400', label: '心情' },
+  SOCIAL: { icon: <Users className="w-4 h-4" />, color: 'text-purple-400', label: '社交' },
+  WORK: { icon: <Briefcase className="w-4 h-4" />, color: 'text-slate-400', label: '工作' },
+  GROWTH: { icon: <BookOpen className="w-4 h-4" />, color: 'text-cyan-400', label: '成长' },
+  LEISURE: { icon: <Gamepad2 className="w-4 h-4" />, color: 'text-amber-400', label: '休闲' },
 };
 
 function FeedItemCard({ item }: { item: FeedItem }) {
@@ -71,6 +78,25 @@ function FeedItemCard({ item }: { item: FeedItem }) {
             </button>
           )}
           
+          {/* v0.2: 显示标签 */}
+          {item.tags && item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {item.tags.slice(0, 4).map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 text-[10px] rounded-full bg-white/5 text-white/50 border border-white/10"
+                >
+                  {tag}
+                </span>
+              ))}
+              {item.tags.length > 4 && (
+                <span className="px-2 py-0.5 text-[10px] text-white/30">
+                  +{item.tags.length - 4}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 mt-2 text-xs text-white/30">
             <Clock className="w-3 h-3" />
             <span>{formatTime(item.created_at)}</span>
@@ -128,7 +154,8 @@ function FeedItemCard({ item }: { item: FeedItem }) {
 export default function FeedHistory({ items, isLoading }: FeedHistoryProps) {
   const [filter, setFilter] = useState<string | null>(null);
   const filteredItems = filter ? items.filter(item => item.category === filter) : items;
-  const categories = ['SLEEP', 'DIET', 'SCREEN', 'ACTIVITY', 'MOOD'];
+  // v0.2: 更新分类列表 - 八维度模型
+  const categories = ['SLEEP', 'DIET', 'ACTIVITY', 'MOOD', 'SOCIAL', 'WORK', 'GROWTH', 'LEISURE', 'SCREEN'];
 
   return (
     <div>

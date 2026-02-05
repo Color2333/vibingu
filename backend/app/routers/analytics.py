@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.models import LifeStream, DailySummary
 from app.services.vibe_calculator import VibeCalculator
+from app.services.dimension_analyzer import get_dimension_analyzer, DIMENSIONS
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -255,3 +256,70 @@ async def recalculate_vibe(
         "vibe_score": summary.vibe_score,
         "message": "已更新"
     }
+
+
+# ========== v0.2 八维度分析 API ==========
+
+@router.get("/dimensions/meta")
+async def get_dimensions_meta():
+    """获取八维度定义元数据"""
+    return {
+        "dimensions": {
+            key: {
+                "name": value["name"],
+                "icon": value["icon"],
+                "description": value["description"],
+                "weight": value["weight"]
+            }
+            for key, value in DIMENSIONS.items()
+        },
+        "total_dimensions": len(DIMENSIONS)
+    }
+
+
+@router.get("/dimensions/today")
+async def get_today_dimensions():
+    """获取今日的八维度分析"""
+    analyzer = get_dimension_analyzer()
+    return analyzer.get_daily_dimension_summary()
+
+
+@router.get("/dimensions/radar/today")
+async def get_today_radar():
+    """获取今日八维度雷达图数据"""
+    analyzer = get_dimension_analyzer()
+    return analyzer.get_dimension_radar_data()
+
+
+@router.get("/dimensions/radar/{date_str}")
+async def get_radar_data(date_str: str):
+    """
+    获取指定日期的八维度雷达图数据
+    
+    - **date_str**: 日期字符串，格式 YYYY-MM-DD
+    """
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
+    
+    analyzer = get_dimension_analyzer()
+    return analyzer.get_dimension_radar_data(target_date)
+
+
+@router.get("/dimensions/{date_str}")
+async def get_dimensions(date_str: str):
+    """
+    获取指定日期的八维度分析
+    
+    - **date_str**: 日期字符串，格式 YYYY-MM-DD
+    """
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
+    
+    analyzer = get_dimension_analyzer()
+    return analyzer.get_daily_dimension_summary(target_date)

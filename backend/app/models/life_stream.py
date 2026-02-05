@@ -26,12 +26,17 @@ class ImageType(str, enum.Enum):
 
 
 class Category(str, enum.Enum):
-    """分类枚举"""
-    SLEEP = "SLEEP"          # 睡眠
-    DIET = "DIET"            # 饮食
-    SCREEN = "SCREEN"        # 屏幕时间
-    ACTIVITY = "ACTIVITY"    # 活动
-    MOOD = "MOOD"            # 情绪
+    """分类枚举 - 八维度模型"""
+    # 核心维度 (PERMA+ 扩展)
+    SLEEP = "SLEEP"          # 睡眠 → 身体维度
+    DIET = "DIET"            # 饮食 → 身体维度
+    ACTIVITY = "ACTIVITY"    # 运动/活动 → 身体维度
+    MOOD = "MOOD"            # 情绪 → 心情维度
+    SOCIAL = "SOCIAL"        # 社交 → 关系维度
+    WORK = "WORK"            # 工作 → 成就维度
+    GROWTH = "GROWTH"        # 学习/成长 → 意义维度
+    LEISURE = "LEISURE"      # 休闲 → 心流维度
+    SCREEN = "SCREEN"        # 屏幕时间 → 数字维度
 
 
 class JSONType(TypeDecorator):
@@ -69,6 +74,12 @@ class LifeStream(Base):
     image_path = Column(String(255), nullable=True, comment="图片存储路径")
     thumbnail_path = Column(String(255), nullable=True, comment="缩略图路径")
     image_saved = Column(Boolean, default=False, comment="是否保存了原图")
+    
+    # 智能标签
+    tags = Column(JSONType, nullable=True, comment="AI生成的标签数组")
+    
+    # 八维度得分 (0-100)
+    dimension_scores = Column(JSONType, nullable=True, comment="维度得分")
     
     def __repr__(self):
         return f"<LifeStream(id={self.id}, category={self.category}, created_at={self.created_at})>"

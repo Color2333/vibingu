@@ -15,7 +15,23 @@ from app.models import LifeStream, InputType, Category
 from app.services.image_classifier import ImageClassifier
 from app.services.data_extractor import DataExtractor
 from app.services.image_storage import ImageStorage
+from app.services.tagger import get_tagger
+from app.services.dimension_analyzer import get_dimension_analyzer
+from app.services.gamification import get_gamification_service
 from app.schemas.feed import FeedResponse
+
+# 延迟加载 RAG 服务（避免启动时的循环导入）
+_rag_service = None
+
+def get_rag():
+    global _rag_service
+    if _rag_service is None:
+        try:
+            from app.services.rag import get_rag_service
+            _rag_service = get_rag_service()
+        except Exception as e:
+            print(f"RAG 服务加载失败: {e}")
+    return _rag_service
 
 router = APIRouter(prefix="/api/feed", tags=["feed"])
 
@@ -23,6 +39,8 @@ router = APIRouter(prefix="/api/feed", tags=["feed"])
 image_classifier = ImageClassifier()
 data_extractor = DataExtractor()
 image_storage = ImageStorage(upload_dir="uploads")
+tagger = get_tagger()
+dimension_analyzer = get_dimension_analyzer()
 
 
 @router.post("", response_model=FeedResponse)
@@ -123,6 +141,21 @@ async def create_feed(
             "should_save": classification_result["should_save_image"],
         }
     
+    # ===== Phase 4: 智能标签生成 =====
+    tags = await tagger.generate_tags(
+        text=text,
+        category=category,
+        meta_data=meta_data,
+        record_id=None,  # 记录还未创建
+    )
+    
+    # ===== Phase 5: 八维度分析 =====
+    dimension_scores = dimension_analyzer.calculate_dimension_scores(
+        category=category or "MOOD",
+        meta_data=meta_data,
+        tags=tags,
+    )
+    
     # 存入数据库
     life_stream = LifeStream(
         input_type=input_type,
@@ -134,11 +167,35 @@ async def create_feed(
         image_path=image_path,
         thumbnail_path=thumbnail_path,
         image_saved=image_path is not None,
+        tags=tags,
+        dimension_scores=dimension_scores,
     )
     
     db.add(life_stream)
     db.commit()
     db.refresh(life_stream)
+    
+    # ===== Phase 6: 游戏化奖励 =====
+    try:
+        gamification = get_gamification_service()
+        # 更新连续记录和经验值
+        gamification.update_streak()
+        # 更新挑战进度
+        gamification.update_challenge_progress(None, category)
+        # 检查新徽章
+        gamification.check_and_award_badges()
+    except Exception as e:
+        print(f"游戏化更新失败: {e}")
+        # 游戏化失败不影响主流程
+    
+    # ===== Phase 7: RAG 索引 =====
+    try:
+        rag = get_rag()
+        if rag:
+            rag.index_record(life_stream)
+    except Exception as e:
+        print(f"RAG 索引失败: {e}")
+        # RAG 索引失败不影响主流程
     
     return FeedResponse(
         id=str(life_stream.id),
@@ -149,6 +206,8 @@ async def create_feed(
         image_saved=life_stream.image_saved,
         image_path=f"/api/feed/image/{image_path}" if image_path else None,
         thumbnail_path=f"/api/feed/image/{thumbnail_path}" if thumbnail_path else None,
+        tags=tags,
+        dimension_scores=dimension_scores,
     )
 
 
@@ -186,6 +245,8 @@ async def get_history(
             "image_type": r.image_type,
             "image_path": f"/api/feed/image/{r.image_path}" if r.image_path else None,
             "thumbnail_path": f"/api/feed/image/{r.thumbnail_path}" if r.thumbnail_path else None,
+            "tags": r.tags,
+            "dimension_scores": r.dimension_scores,
         }
         for r in records
     ]

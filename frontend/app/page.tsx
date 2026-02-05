@@ -12,6 +12,14 @@ import EmptyState from '@/components/EmptyState';
 import LoginScreen from '@/components/LoginScreen';
 import Milestones from '@/components/Milestones';
 import Goals from '@/components/Goals';
+import DimensionRadar from '@/components/DimensionRadar';
+import TagCloud from '@/components/TagCloud';
+import TokenUsage from '@/components/TokenUsage';
+import ChatAssistant from '@/components/ChatAssistant';
+import LevelCard from '@/components/LevelCard';
+import BadgeCollection from '@/components/BadgeCollection';
+import ChallengeList from '@/components/ChallengeList';
+import HealthAlerts from '@/components/HealthAlerts';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -27,6 +35,8 @@ interface FeedItem {
   image_type?: string;
   image_path?: string;
   thumbnail_path?: string;
+  tags?: string[];
+  dimension_scores?: Record<string, number>;
 }
 
 export default function Home() {
@@ -107,9 +117,29 @@ export default function Home() {
           <VibeTrendChart key={`trend-${refreshKey}`} />
         </section>
 
+        {/* v0.2: 八维度雷达图 */}
+        <section className="mt-6 animate-fade-in delay-3">
+          <DimensionRadar key={`radar-${refreshKey}`} />
+        </section>
+
+        {/* v0.2: 标签云 */}
+        <section className="mt-6 animate-fade-in delay-3">
+          <TagCloud key={`tags-${refreshKey}`} />
+        </section>
+
         {/* Smart Suggestions */}
         <section className="mt-6 animate-fade-in delay-3">
           <SmartSuggestions key={`suggestions-${refreshKey}`} />
+        </section>
+
+        {/* 健康提醒 */}
+        <section className="mt-6 animate-fade-in delay-4">
+          <HealthAlerts key={`alerts-${refreshKey}`} />
+        </section>
+
+        {/* v0.2: Token 用量统计 */}
+        <section className="mt-6 animate-fade-in delay-4">
+          <TokenUsage />
         </section>
 
         {/* Milestones */}
@@ -125,6 +155,19 @@ export default function Home() {
         {/* Reminder Settings */}
         <section className="mt-6 animate-fade-in">
           <ReminderSettings />
+        </section>
+
+        {/* 游戏化: 等级 & 徽章 & 挑战 */}
+        <section className="mt-8 pt-8 border-t border-white/10 animate-fade-in">
+          <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center gap-2">
+            <span className="text-xl">🎮</span>
+            成长系统
+          </h2>
+          <div className="space-y-4">
+            <LevelCard key={`level-${refreshKey}`} />
+            <ChallengeList key={`challenges-${refreshKey}`} />
+            <BadgeCollection key={`badges-${refreshKey}`} />
+          </div>
         </section>
 
         {/* Feed History */}
@@ -149,6 +192,9 @@ export default function Home() {
           <MagicInputBar onSuccess={handleFeedSuccess} onLoading={setIsLoading} />
         </div>
       </div>
+
+      {/* AI Chat Assistant */}
+      <ChatAssistant />
     </div>
   );
 }

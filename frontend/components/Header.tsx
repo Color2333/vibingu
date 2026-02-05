@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, FileText, Menu, X, RefreshCw, Eye, LogOut, Calendar } from 'lucide-react';
+import { Download, FileText, Menu, X, RefreshCw, Eye, LogOut, Calendar, Brain } from 'lucide-react';
 import Link from 'next/link';
 
 interface HeaderProps {
@@ -100,6 +100,15 @@ export default function Header({ onRefresh, onLogout }: HeaderProps) {
               >
                 <Calendar className="w-4 h-4" />
                 时间线
+              </Link>
+
+              <Link
+                href="/insights"
+                onClick={() => setShowMenu(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <Brain className="w-4 h-4" />
+                时间智能
               </Link>
 
               <div className="divider my-2" />

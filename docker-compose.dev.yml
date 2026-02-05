@@ -1,0 +1,60 @@
+# Development Docker Compose
+# Usage: docker-compose -f docker-compose.dev.yml up --build
+
+version: '3.8'
+
+services:
+  # Backend API Service (with hot reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vibingu-backend-dev
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///./data/vibingu.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - UPLOAD_DIR=/app/uploads
+      - DEBUG=true
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+    volumes:
+      - ./backend:/app
+      - backend_data_dev:/app/data
+      - backend_uploads_dev:/app/uploads
+      - chroma_data_dev:/app/chroma_db
+    ports:
+      - "8000:8000"
+    networks:
+      - vibingu-network-dev
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Web Application (with hot reload)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: vibingu-frontend-dev
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - vibingu-network-dev
+
+networks:
+  vibingu-network-dev:
+    driver: bridge
+
+volumes:
+  backend_data_dev:
+  backend_uploads_dev:
+  chroma_data_dev:
