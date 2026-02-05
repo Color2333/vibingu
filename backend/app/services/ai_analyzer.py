@@ -4,16 +4,15 @@ AI 分析器 - 基于历史数据生成深度洞察
 
 import json
 import asyncio
-import httpx
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from openai import AsyncOpenAI
 from sqlalchemy.orm import Session
 from collections import defaultdict
 
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models import LifeStream
+from app.services.ai_client import get_ai_client, AIClientError
 
 settings = get_settings()
 
@@ -22,18 +21,13 @@ class AIAnalyzer:
     """AI 驱动的数据分析器"""
     
     def __init__(self):
-        api_key = settings.get_ai_api_key()
-        base_url = settings.get_ai_base_url()
-        # 设置 60 秒超时
-        self.client = AsyncOpenAI(
-            api_key=api_key, 
-            base_url=base_url,
-            timeout=httpx.Timeout(60.0)
-        ) if api_key else None
-        self.text_model = settings.text_model
-        # 使用 flash 模型提高响应速度，分析任务不需要太高智能
-        self.analysis_model = settings.simple_text_model  # glm-4.7-flash
-        self.smart_model = settings.smart_model  # 保留用于深度洞察
+        # 使用统一的 AI 客户端（带 Token 追踪）
+        try:
+            self.ai_client = get_ai_client()
+            self.has_ai = self.ai_client.client is not None
+        except Exception:
+            self.ai_client = None
+            self.has_ai = False
     
     def _get_db(self) -> Session:
         return SessionLocal()
@@ -60,7 +54,7 @@ class AIAnalyzer:
             # 汇总数据
             summary_data = self._summarize_records(records)
             
-            if not self.client:
+            if not self.has_ai:
                 return self._mock_analysis(summary_data)
             
             # AI 分析
@@ -88,7 +82,7 @@ class AIAnalyzer:
             
             summary_data = self._summarize_records(records)
             
-            if not self.client:
+            if not self.has_ai:
                 return self._mock_trend_analysis(summary_data)
             
             return await self._ai_analyze_trends(summary_data, days)
@@ -115,7 +109,7 @@ class AIAnalyzer:
             
             summary_data = self._summarize_records(records)
             
-            if not self.client:
+            if not self.has_ai:
                 return self._mock_suggestions(summary_data)
             
             return await self._ai_generate_suggestions(summary_data)
@@ -142,7 +136,7 @@ class AIAnalyzer:
             
             summary_data = self._summarize_records(records)
             
-            if not self.client:
+            if not self.has_ai:
                 return {"answer": "AI 服务未配置，无法回答问题", "confidence": "low"}
             
             return await self._ai_deep_insight(question, summary_data)
@@ -278,30 +272,38 @@ class AIAnalyzer:
 3. 建议要可行，能立即执行"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.analysis_model,  # 使用快速模型
+            result = await self.ai_client.chat_completion(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "请分析我的数据，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=3000,  # 增加 token 数以适应推理模型
+                max_tokens=3000,
+                task_type="weekly_analysis",
+                task_description="AI 周度分析",
+                json_response=True,
             )
             
-            content = response.choices[0].message.content
+            content = result["content"]
             
             if not content:
-                print("AI 返回空内容，可能是 token 不足")
+                print("AI 返回空内容")
                 return self._mock_analysis(data)
             
-            # 尝试提取 JSON
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
+            if isinstance(content, dict):
+                content["has_data"] = True
+                return content
             
-            result = json.loads(content)
-            result["has_data"] = True
-            return result
+            # 如果返回的是字符串，尝试解析
+            try:
+                parsed = json.loads(content)
+                parsed["has_data"] = True
+                return parsed
+            except json.JSONDecodeError:
+                return self._mock_analysis(data)
+                
+        except AIClientError as e:
+            print(f"AI 分析错误: {e}")
+            return self._mock_analysis(data)
         except Exception as e:
             print(f"AI 分析错误: {e}")
             return self._mock_analysis(data)
@@ -336,28 +338,34 @@ class AIAnalyzer:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.analysis_model,  # 使用快速模型
+            result = await self.ai_client.chat_completion(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "分析趋势，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=2500,  # 增加 token 数
+                max_tokens=2500,
+                task_type="trend_analysis",
+                task_description="AI 趋势分析",
+                json_response=True,
             )
             
-            content = response.choices[0].message.content
+            content = result["content"]
             if not content:
                 return self._mock_trend_analysis(data)
-                
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
             
-            result = json.loads(content)
-            result["has_data"] = True
-            result["period_days"] = days
-            return result
+            if isinstance(content, dict):
+                content["has_data"] = True
+                content["period_days"] = days
+                return content
+            
+            try:
+                parsed = json.loads(content)
+                parsed["has_data"] = True
+                parsed["period_days"] = days
+                return parsed
+            except json.JSONDecodeError:
+                return self._mock_trend_analysis(data)
+                
         except Exception as e:
             print(f"AI 趋势分析错误: {e}")
             return self._mock_trend_analysis(data)
@@ -392,25 +400,29 @@ class AIAnalyzer:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.analysis_model,  # 使用快速模型
+            result = await self.ai_client.chat_completion(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "给我一些建议，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=2500,  # 增加 token 数
+                max_tokens=2500,
+                task_type="smart_suggestions",
+                task_description="AI 智能建议",
+                json_response=True,
             )
             
-            content = response.choices[0].message.content
+            content = result["content"]
             if not content:
                 return self._mock_suggestions(data)
-                
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
             
-            return json.loads(content)
+            if isinstance(content, dict):
+                return content
+            
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return self._mock_suggestions(data)
+                
         except Exception as e:
             print(f"AI 建议生成错误: {e}")
             return self._mock_suggestions(data)
@@ -439,25 +451,30 @@ class AIAnalyzer:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.smart_model,
+            result = await self.ai_client.chat_completion(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": f"{question}\n\n只输出JSON格式，不要其他内容。"}
                 ],
-                max_tokens=2000,  # 增加 token 数
+                model=settings.smart_model,  # 深度洞察使用高级模型
+                max_tokens=2000,
+                task_type="deep_insight",
+                task_description="AI 深度洞察",
+                json_response=True,
             )
             
-            content = response.choices[0].message.content
+            content = result["content"]
             if not content:
                 return {"answer": "AI 未返回内容", "confidence": "low"}
-                
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
             
-            return json.loads(content)
+            if isinstance(content, dict):
+                return content
+            
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return {"answer": content, "confidence": "low"}
+                
         except Exception as e:
             print(f"AI 深度洞察错误: {e}")
             return {"answer": f"分析出错: {str(e)}", "confidence": "low"}
