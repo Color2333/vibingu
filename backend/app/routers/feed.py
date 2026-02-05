@@ -339,6 +339,72 @@ async def get_public_records(
     ]
 
 
+@router.get("/public/stats")
+async def get_public_stats(db: Session = Depends(get_db)):
+    """
+    获取公开记录的统计数据（无需登录）
+    """
+    from sqlalchemy import func
+    from collections import Counter
+    
+    # 获取所有公开记录
+    records = db.query(LifeStream).filter(
+        LifeStream.is_public == True,
+        LifeStream.is_deleted != True
+    ).all()
+    
+    if not records:
+        return {
+            "total_records": 0,
+            "total_days": 0,
+            "category_distribution": {},
+            "avg_score": None,
+            "recent_streak": 0,
+            "top_tags": [],
+        }
+    
+    # 统计数据
+    category_count = Counter()
+    tag_count = Counter()
+    dates = set()
+    scores = []
+    
+    for r in records:
+        category_count[r.category] += 1
+        
+        # 日期统计
+        if r.record_time:
+            dates.add(r.record_time.date())
+        elif r.created_at:
+            dates.add(r.created_at.date())
+        
+        # 标签统计
+        if r.tags:
+            for tag in r.tags:
+                tag_count[tag] += 1
+        
+        # 分数统计
+        if r.meta_data:
+            score = r.meta_data.get('health_score') or r.meta_data.get('score')
+            if score is not None:
+                scores.append(score)
+    
+    # 计算平均分
+    avg_score = round(sum(scores) / len(scores), 1) if scores else None
+    
+    # Top 标签
+    top_tags = [tag for tag, _ in tag_count.most_common(10)]
+    
+    return {
+        "total_records": len(records),
+        "total_days": len(dates),
+        "category_distribution": dict(category_count),
+        "avg_score": avg_score,
+        "recent_streak": 0,  # 可以后续计算连续记录天数
+        "top_tags": top_tags,
+    }
+
+
 @router.get("/image/{path:path}")
 async def get_image(path: str):
     """
