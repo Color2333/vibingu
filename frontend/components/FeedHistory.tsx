@@ -281,17 +281,29 @@ const TimelineCard = memo(function TimelineCard({
           {/* 可点击区域 */}
           <div onClick={goToDetail}>
             {/* 原始内容 - 显示更多内容 */}
-            {item.raw_content && !item.raw_content.startsWith('/') && !item.raw_content.includes('/Users/') && (
-              <p className="text-[15px] text-[var(--text-primary)] leading-relaxed mb-2">
-                {item.raw_content.length > 150 ? item.raw_content.slice(0, 150) + '...' : item.raw_content}
-              </p>
-            )}
+            {(() => {
+              const content = item.raw_content;
+              if (content && !content.startsWith('/') && !content.includes('/Users/')) {
+                return (
+                  <p className="text-[15px] text-[var(--text-primary)] leading-relaxed mb-2">
+                    {content.length > 150 ? content.slice(0, 150) + '...' : content}
+                  </p>
+                );
+              }
+              return null;
+            })()}
             {/* 如果没有原始内容但有分析，显示摘要 */}
-            {(!item.raw_content || item.raw_content.includes('/Users/')) && meta.analysis && (
-              <p className="text-[15px] text-[var(--text-primary)] leading-relaxed mb-2">
-                {(meta.analysis as string).slice(0, 120)}...
-              </p>
-            )}
+            {(() => {
+              const content = item.raw_content;
+              if ((!content || content.includes('/Users/')) && analysis) {
+                return (
+                  <p className="text-[15px] text-[var(--text-primary)] leading-relaxed mb-2">
+                    {analysis.slice(0, 120)}...
+                  </p>
+                );
+              }
+              return null;
+            })()}
             
             {/* Pending 状态 */}
             {isPending && (

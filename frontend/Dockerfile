@@ -4,6 +4,12 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 
+# Configure npm to use Chinese mirror
+RUN npm config set registry https://registry.npmmirror.com
+
+# Configure Alpine apk to use Chinese mirror
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 # Copy package files
 COPY package.json package-lock.json* ./
 
@@ -14,6 +20,9 @@ RUN npm ci --legacy-peer-deps
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Configure npm to use Chinese mirror
+RUN npm config set registry https://registry.npmmirror.com
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -30,6 +39,9 @@ RUN npm run build
 FROM node:20-alpine AS runner
 
 WORKDIR /app
+
+# Configure Alpine apk to use Chinese mirror
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # Set environment variables
 ENV NODE_ENV=production

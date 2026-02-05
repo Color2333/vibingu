@@ -348,13 +348,17 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
                   </div>
                   
                   {/* Content */}
-                  {record.raw_content && !record.raw_content.startsWith('/') && !record.raw_content.includes('/Users/') && (
-                    <p className="text-[var(--text-primary)] mb-3 leading-relaxed">
-                      {record.raw_content.length > 150 
-                        ? record.raw_content.slice(0, 150) + '...' 
-                        : record.raw_content}
-                    </p>
-                  )}
+                  {(() => {
+                    const content = record.raw_content;
+                    if (content && !content.startsWith('/') && !content.includes('/Users/')) {
+                      return (
+                        <p className="text-[var(--text-primary)] mb-3 leading-relaxed">
+                          {content.length > 150 ? content.slice(0, 150) + '...' : content}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                   
                   {/* Image */}
                   {record.image_saved && record.thumbnail_path && (

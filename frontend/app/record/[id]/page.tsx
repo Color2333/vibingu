@@ -301,16 +301,22 @@ export default function RecordDetailPage() {
           )}
 
           {/* Original Content */}
-          {record.raw_content && !record.raw_content.startsWith('/') && !record.raw_content.includes('/Users/') && (
-            <div className="mb-4">
-              <h3 className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
-                <span>原始内容</span>
-              </h3>
-              <p className="text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
-                {record.raw_content}
-              </p>
-            </div>
-          )}
+          {(() => {
+            const content = record.raw_content;
+            if (content && !content.startsWith('/') && !content.includes('/Users/')) {
+              return (
+                <div className="mb-4">
+                  <h3 className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                    <span>原始内容</span>
+                  </h3>
+                  <p className="text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
+                    {content}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* AI Insight */}
           {record.ai_insight && record.ai_insight !== '已记录' && (
