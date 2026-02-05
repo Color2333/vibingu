@@ -40,7 +40,7 @@ class RAGService:
         
         # 初始化 ChromaDB
         self.client = chromadb.PersistentClient(
-            path=persist_dir,
+            path=self.persist_dir,
             settings=Settings(anonymized_telemetry=False)
         )
         
