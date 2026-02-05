@@ -93,17 +93,35 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (items) {
+      // 先检查是否有图片
+      let hasImage = false;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.type.indexOf('image') !== -1) {
+          hasImage = true;
           const file = item.getAsFile();
           if (file) {
+            // 阻止默认粘贴行为，避免同时粘贴图片链接文本
+            e.preventDefault();
             setImage(file);
             const reader = new FileReader();
-            reader.onload = (e) => setImagePreview(e.target?.result as string);
+            reader.onload = (ev) => setImagePreview(ev.target?.result as string);
             reader.readAsDataURL(file);
           }
           break;
+        }
+      }
+      
+      // 如果有图片，检查是否同时粘贴了图片链接文本，如果是则过滤掉
+      if (hasImage) {
+        const pastedText = e.clipboardData?.getData('text/plain') || '';
+        // 如果粘贴的文本看起来像是图片链接，就不添加到输入框
+        const isImageUrl = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(pastedText) ||
+                          /^(data:image|blob:|file:)/i.test(pastedText) ||
+                          /^https?:\/\/.*\.(jpg|jpeg|png|gif|webp)/i.test(pastedText);
+        if (!isImageUrl && pastedText.trim()) {
+          // 如果不是图片链接，允许添加文本作为描述
+          setText(prev => prev + pastedText);
         }
       }
     }
@@ -156,6 +174,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
 
     const currentText = text.trim();
     const currentImagePreview = imagePreview;
+    const currentImage = image;
 
     // 立即清空输入
     setText('');
@@ -175,7 +194,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
     try {
       const formData = new FormData();
       if (currentText) formData.append('text', currentText);
-      if (image) formData.append('image', image);
+      if (currentImage) formData.append('image', currentImage);
       
       // 传递客户端实时时间
       const clientTime = new Date().toISOString();
@@ -194,6 +213,12 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
       onSuccess(data);
     } catch (err) {
       console.error(err);
+      // 失败时恢复输入内容，方便用户重试
+      setText(currentText);
+      if (currentImage && currentImagePreview) {
+        setImage(currentImage);
+        setImagePreview(currentImagePreview);
+      }
       if (onError) {
         onError();
       }

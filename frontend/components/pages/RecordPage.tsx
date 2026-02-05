@@ -14,6 +14,7 @@ export interface FeedItem {
   meta_data: Record<string, unknown> | null;
   ai_insight: string | null;
   created_at: string;
+  record_time?: string;  // 实际发生时间（AI分析得出）
   image_saved?: boolean;
   image_type?: string;
   image_path?: string;
@@ -163,7 +164,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
       tempIds.forEach(id => feedDataRef.current.delete(id));
       return prev.filter(id => !id.startsWith('temp-'));
     });
-    showToast('error', '记录失败，请重试');
+    showToast('error', '记录失败，内容已恢复，点击发送重试');
   }, [showToast]);
 
   // 从 Map 获取 items 列表传给子组件

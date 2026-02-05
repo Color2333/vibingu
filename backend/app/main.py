@@ -10,12 +10,46 @@ from app.routers.ai_analysis import router as ai_analysis_router
 settings = get_settings()
 
 
+def run_migrations():
+    """运行数据库迁移（SQLite）"""
+    import sqlite3
+    import os
+    
+    db_url = settings.get_database_url()
+    if not db_url.startswith("sqlite"):
+        return  # 只对 SQLite 执行自动迁移
+    
+    # 提取数据库路径
+    db_path = db_url.replace("sqlite:///", "")
+    if not os.path.exists(db_path):
+        return
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 检查现有列
+        cursor.execute("PRAGMA table_info(life_stream)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        # 添加 record_time 列（v0.3）
+        if "record_time" not in columns:
+            cursor.execute("ALTER TABLE life_stream ADD COLUMN record_time DATETIME")
+            print("✅ 自动迁移: 添加 record_time 列")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ 自动迁移失败: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时创建表（开发环境）
     if settings.debug:
         Base.metadata.create_all(bind=engine)
+        run_migrations()  # 运行数据库迁移
     yield
     # 关闭时的清理工作（如需要）
 

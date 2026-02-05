@@ -63,6 +63,57 @@ class DataExtractor:
         else:
             return "深夜"
     
+    def _parse_record_time(self, record_time_str: Optional[str], client_time: Optional[str]) -> Optional[datetime]:
+        """解析 AI 返回的记录时间"""
+        if not record_time_str:
+            return None
+        
+        client_dt = self._parse_client_time(client_time)
+        
+        try:
+            # 尝试解析 ISO 格式 "2026-02-04T23:30:00"
+            if 'T' in record_time_str or '-' in record_time_str:
+                # 可能是完整日期时间
+                if len(record_time_str) == 10:  # "2026-02-04"
+                    dt = datetime.strptime(record_time_str, "%Y-%m-%d")
+                    return dt.replace(hour=12, tzinfo=DEFAULT_TIMEZONE)  # 默认中午
+                else:
+                    dt = datetime.fromisoformat(record_time_str.replace('Z', '+00:00'))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=DEFAULT_TIMEZONE)
+                    return dt
+            
+            # 尝试解析相对时间
+            record_time_str = record_time_str.lower().strip()
+            
+            if record_time_str in ['今天', 'today', '现在', 'now']:
+                return client_dt
+            elif record_time_str in ['昨天', 'yesterday', '昨晚', '昨天晚上']:
+                return client_dt - timedelta(days=1)
+            elif record_time_str in ['前天', '大前天']:
+                days = 2 if '大' not in record_time_str else 3
+                return client_dt - timedelta(days=days)
+            elif '天前' in record_time_str or 'days ago' in record_time_str:
+                # 解析 "2天前" 或 "2 days ago"
+                match = re.search(r'(\d+)', record_time_str)
+                if match:
+                    days = int(match.group(1))
+                    return client_dt - timedelta(days=days)
+            
+            # 尝试解析 "昨晚 23:30" 格式
+            if '昨' in record_time_str:
+                time_match = re.search(r'(\d{1,2}):(\d{2})', record_time_str)
+                yesterday = client_dt - timedelta(days=1)
+                if time_match:
+                    hour, minute = int(time_match.group(1)), int(time_match.group(2))
+                    return yesterday.replace(hour=hour, minute=minute)
+                return yesterday
+            
+        except Exception as e:
+            print(f"记录时间解析错误: {e}, record_time={record_time_str}")
+        
+        return None
+    
     async def extract(
         self,
         image_type: str,
@@ -113,9 +164,19 @@ class DataExtractor:
         
         current_time = self._get_current_time(client_time)
         time_period = self._get_time_period(client_time)
+        client_dt = self._parse_client_time(client_time)
+        today_date = client_dt.strftime("%Y-%m-%d")
+        yesterday_date = (client_dt - timedelta(days=1)).strftime("%Y-%m-%d")
         
         system_prompt = f"""你是 Vibing u 的生活记录助手，擅长从只言片语中洞察用户状态。
 当前时间：{current_time}（{time_period}）
+
+【重要 - 时间分析】
+今天是 {today_date}。请分析用户描述的事件实际发生在什么时候：
+- 如果用户说"昨天"、"昨晚"，record_time 应为 {yesterday_date}
+- 如果用户说"今天早上"、"刚才"、"现在"，record_time 应为当前时间
+- 如果用户说"上周"、"3天前"等，请计算正确的日期
+- 如果没有明确时间线索，默认为当前时间
 
 【重要】本次输入仅有文字，没有图片。请深度分析用户输入。
 
@@ -139,6 +200,7 @@ class DataExtractor:
 请以 JSON 格式输出：
 {{
     "category": "分类",
+    "record_time": "事件实际发生时间，ISO格式如 {today_date}T{client_dt.strftime('%H:%M')}:00 或相对时间如'昨天'",
     "mood": "happy/neutral/sad/tired/anxious/excited/calm/etc",
     "note": "简短描述",
     "analysis": "深度分析（50-100字）：分析用户当前状态、可能的情绪原因、与时间/场景的关联等",
@@ -148,23 +210,36 @@ class DataExtractor:
     "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【禁止】返回'已记录'这种空洞回复。"
 }}"""
 
-        return await self._call_ai(system_prompt, None, text, "MOOD")
+        return await self._call_ai(system_prompt, None, text, "MOOD", client_time)
     
     async def _extract_sleep_data(self, image_base64: Optional[str], text: Optional[str], client_time: Optional[str]) -> Dict[str, Any]:
         """提取睡眠数据 + 睡眠分析"""
         
         current_time = self._get_current_time(client_time)
+        client_dt = self._parse_client_time(client_time)
+        today_date = client_dt.strftime("%Y-%m-%d")
+        yesterday_date = (client_dt - timedelta(days=1)).strftime("%Y-%m-%d")
         
-        system_prompt = f"""你是一个睡眠健康专家。当前时间：{current_time}
-这是一张睡眠记录截图（iPhone 健康 App / Sleep Cycle 等）。
+        system_prompt = f"""你是一个睡眠健康专家和 OCR 数据提取专家。当前时间：{current_time}
+这是一张睡眠记录截图（iPhone 健康 App / Sleep Cycle / 小米运动 / AutoSleep 等）。
 
-请仔细识别并：
-1. **提取数据**：入睡时间、起床时间、时长、质量分数、深睡/浅睡/REM
-2. **深度分析**：评估睡眠质量，分析可能影响因素（时间、时长、深睡比例等）
-3. **给出建议**：基于数据给出改善建议
+【最重要 - 时间分析】
+用户正在提交睡眠数据，需要判断这是哪一天的睡眠：
+- 今天是 {today_date}
+- 如果截图显示的日期是昨天或更早，record_date 应设为那一天
+- 如果截图显示今天早上醒来的数据，实际入睡时间是昨晚，record_date 应设为昨天 {yesterday_date}
+- 如果无法判断日期，默认是昨晚到今早的睡眠，record_date 设为 {yesterday_date}
+
+请务必识别以下核心数据：
+1. **入睡时间 (sleep_time)**：截图中显示的入睡/就寝时间（如 23:30、11:30 PM 等）
+2. **苏醒时间 (wake_time)**：截图中显示的起床/苏醒时间（如 07:15、7:15 AM 等）
+3. **睡眠时长**：总睡眠时间（如 7小时45分、7h45m 等）
+4. **睡眠阶段**：深睡、浅睡、REM、清醒等各阶段时长
 
 请以 JSON 格式输出：
 {{
+    "record_date": "{yesterday_date}",
+    "record_time": "{yesterday_date}T23:30:00",
     "sleep_time": "23:30",
     "wake_time": "07:15", 
     "duration_hours": 7.75,
@@ -173,16 +248,23 @@ class DataExtractor:
     "deep_sleep_hours": 2.5,
     "rem_hours": 1.5,
     "light_sleep_hours": 3.75,
-    "analysis": "深度分析（50-100字）：评估睡眠质量，深睡占比是否达标，入睡时间是否健康等",
+    "awake_hours": 0.5,
+    "analysis": "深度分析（50-100字）：评估睡眠质量，深睡占比是否达标（建议20-40%），入睡时间是否健康（建议22:00-23:30）等",
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["睡眠", "健康"],
     "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。"
 }}
 
-注意：只提取可见数据，不可见的设为 null。深度分析和建议基于可见数据给出。"""
+【重要提示】：
+1. record_date 是这条睡眠记录归属的日期（入睡那天），record_time 是入睡的完整时间戳
+2. 入睡时间和苏醒时间是用户最关心的数据，请优先识别
+3. 时间格式统一为 24 小时制（如 23:30，不要用 11:30 PM）
+4. 如果截图中有时间轴，请从时间轴的起止点推断入睡和苏醒时间
+5. 如果截图显示的是历史数据（如2天前），请正确设置 record_date
+6. 只有确实无法识别时才设为 null"""
 
-        return await self._call_ai(system_prompt, image_base64, text, "SLEEP")
+        return await self._call_ai(system_prompt, image_base64, text, "SLEEP", client_time)
     
     async def _extract_screen_time(self, image_base64: Optional[str], text: Optional[str], client_time: Optional[str]) -> Dict[str, Any]:
         """提取屏幕时间数据 + App 排行 + 深度分析"""
@@ -227,6 +309,7 @@ class DataExtractor:
     "first_pickup": "07:23",
     "analysis": "深度分析（80-120字）：分析屏幕使用是否过度，社交/娱乐 App 占比，是否影响效率和健康，与拿起次数的关联等",
     "suggestions": ["具体建议1（如限制某App）", "具体建议2（如设置屏幕时间）"],
+    "record_time": "截图数据所属日期时间，ISO格式",
     "trend": "up/down/stable",
     "health_score": 60,
     "tags": ["屏幕时间", "数字健康"],
@@ -236,9 +319,10 @@ class DataExtractor:
 注意：
 1. **务必识别所有可见的 App 名称和时长**，这是最重要的数据
 2. 如果某项不可见，设为 null
-3. 分析要具体，建议要可行"""
+3. 分析要具体，建议要可行
+4. record_time 应为截图所示日期，如果是今天的数据用当前时间，如果是昨天的用昨天的日期"""
 
-        return await self._call_ai(system_prompt, image_base64, text, "SCREEN")
+        return await self._call_ai(system_prompt, image_base64, text, "SCREEN", client_time)
     
     async def _extract_activity_data(self, image_base64: Optional[str], text: Optional[str], client_time: Optional[str]) -> Dict[str, Any]:
         """提取运动数据 + 分析"""
@@ -262,14 +346,17 @@ class DataExtractor:
     "pace": "5'30''/km",
     "avg_heart_rate": 145,
     "max_heart_rate": 168,
+    "record_time": "运动实际发生时间，ISO格式",
     "analysis": "深度分析（50-100字）：评估运动强度、心率区间、是否达到训练效果等",
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["运动", "健身"],
     "reply_text": "一句有力的鼓励（15-30字），肯定运动成果或激励继续保持。【禁止】空洞的'已记录'。"
-}}"""
+}}
 
-        return await self._call_ai(system_prompt, image_base64, text, "ACTIVITY")
+注意：record_time 应为运动实际发生的时间，如果截图显示是昨天的运动记录，应设为昨天的日期。"""
+
+        return await self._call_ai(system_prompt, image_base64, text, "ACTIVITY", client_time)
     
     async def _extract_food_data(self, image_base64: Optional[str], text: Optional[str], client_time: Optional[str]) -> Dict[str, Any]:
         """提取食物数据 + 营养分析"""
@@ -308,13 +395,16 @@ class DataExtractor:
         "fat": "high/medium/low",
         "fiber": "high/medium/low"
     }},
+    "record_time": "这餐实际发生时间，ISO格式或相对时间如'今天中午'",
     "analysis": "营养分析（50-100字）：评估这餐的营养均衡性、热量是否合适、搭配是否健康等",
     "suggestions": ["具体建议1", "具体建议2"],
     "tags": ["饮食", "美食"],
     "reply_text": "一句有趣的评价（15-30字），点评这餐的营养或美味程度。【禁止】空洞的'已记录'。"
-}}"""
+}}
 
-        return await self._call_ai(system_prompt, image_base64, text, "DIET")
+注意：record_time 应为这餐实际发生的时间。如果用户说"昨天的午餐"，应设为昨天中午。"""
+
+        return await self._call_ai(system_prompt, image_base64, text, "DIET", client_time)
     
     async def _extract_general(
         self, 
@@ -353,6 +443,7 @@ class DataExtractor:
 请以 JSON 格式输出：
 {{
     "description": "照片内容描述",
+    "record_time": "照片实际拍摄/发生时间，如用户说'昨天'则为昨天的日期",
     "mood": "happy/neutral/tired/excited/calm/etc",
     "analysis": "深度分析（30-50字）：从照片推测用户状态、情绪、可能在做什么",
     "suggestions": ["如有需要的建议"],
@@ -360,7 +451,7 @@ class DataExtractor:
     "reply_text": "一句温暖、有洞察的回复（15-30字），反映照片传递的情绪或给予鼓励。【禁止】空洞的'已记录'。"
 }}"""
 
-        result = await self._call_ai(system_prompt, image_base64, text, category_map.get(image_type, "MOOD"))
+        result = await self._call_ai(system_prompt, image_base64, text, category_map.get(image_type, "MOOD"), client_time)
         return result
     
     async def _call_ai(
@@ -368,7 +459,8 @@ class DataExtractor:
         system_prompt: str, 
         image_base64: Optional[str], 
         text: Optional[str],
-        category: str
+        category: str,
+        client_time: Optional[str] = None
     ) -> Dict[str, Any]:
         """调用 AI 接口"""
         
@@ -404,16 +496,23 @@ class DataExtractor:
         result = json.loads(response.choices[0].message.content)
         
         # 确保 analysis 和 suggestions 存在
-        meta_data = {k: v for k, v in result.items() if k != "reply_text"}
+        meta_data = {k: v for k, v in result.items() if k not in ["reply_text", "record_time", "record_date"]}
         if "analysis" not in meta_data:
             meta_data["analysis"] = None
         if "suggestions" not in meta_data:
             meta_data["suggestions"] = []
         
+        # 处理 record_time（实际发生时间）
+        record_time = None
+        record_time_str = result.get("record_time") or result.get("record_date")
+        if record_time_str:
+            record_time = self._parse_record_time(record_time_str, client_time)
+        
         return {
             "category": category,
             "meta_data": meta_data,
             "reply_text": result.get("reply_text", "已记录"),
+            "record_time": record_time,
         }
     
     def _mock_extract(

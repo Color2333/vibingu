@@ -17,6 +17,7 @@ class FeedResponse(BaseModel):
     meta_data: Optional[Dict[str, Any]] = None
     ai_insight: str
     created_at: datetime
+    record_time: Optional[datetime] = None  # 实际发生时间（AI分析得出）
     
     # 图片相关字段
     image_saved: bool = False

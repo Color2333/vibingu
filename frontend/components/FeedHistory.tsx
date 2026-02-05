@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Moon, Utensils, Smartphone, Activity, Smile, Clock, 
   Image as ImageIcon, X, Users, Briefcase, BookOpen, 
-  Gamepad2, Sparkles, TrendingUp, TrendingDown, Lightbulb, 
-  BarChart3, Heart, Zap
+  Gamepad2, Sparkles, Lightbulb, ChevronRight, MessageCircle
 } from 'lucide-react';
 import type { FeedItem } from '@/components/pages/RecordPage';
 
@@ -42,42 +42,28 @@ function formatDateHeader(dateStr: string): { title: string; subtitle: string } 
   return { title: monthDay, subtitle: weekday };
 }
 
-// ======== 关键改动2: FeedCard 动画优化 ========
-// 每个卡片自己管理动画状态 (hasAnimated)
-// 只在首次挂载时触发一次动画
-// 动画结束后移除 class，不会重复触发
-const FeedCard = memo(function FeedCard({ item }: { item: FeedItem }) {
+// ========== 时间轴卡片组件 ==========
+const TimelineCard = memo(function TimelineCard({ item, isLast }: { item: FeedItem; isLast: boolean }) {
   const [showImage, setShowImage] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const hasAnimatedRef = useRef(false);
+  const router = useRouter();
   
   const category = item.category || 'MOOD';
   const config = categoryConfig[category] || categoryConfig.MOOD;
   const isPending = item._pending;
   const meta = item.meta_data || {};
 
-  // 动画效果：只在首次挂载时触发
+  // 动画效果
   useEffect(() => {
     const el = cardRef.current;
     if (!el || hasAnimatedRef.current) return;
-    
-    // 标记已经执行过动画
     hasAnimatedRef.current = true;
-    
-    // 添加动画 class
     el.classList.add('animate-slide-in');
-    
-    // 动画结束后移除 class
-    const handleEnd = () => {
-      el.classList.remove('animate-slide-in');
-    };
-    
+    const handleEnd = () => el.classList.remove('animate-slide-in');
     el.addEventListener('animationend', handleEnd, { once: true });
-    
-    return () => {
-      el.removeEventListener('animationend', handleEnd);
-    };
-  }, []); // 空依赖，只在挂载时执行一次
+    return () => el.removeEventListener('animationend', handleEnd);
+  }, []);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
@@ -86,242 +72,201 @@ const FeedCard = memo(function FeedCard({ item }: { item: FeedItem }) {
   // 解析数据
   const analysis = meta.analysis as string | undefined;
   const suggestions = meta.suggestions as string[] | undefined;
-  const trend = meta.trend as string | undefined;
   const healthScore = meta.health_score as number | undefined;
-  const topApps = meta.top_apps as Array<{name: string; time: string; minutes: number}> | undefined;
+  const sleepScore = meta.score as number | undefined;
+  const durationHours = meta.duration_hours as number | undefined;
   const totalScreenTime = meta.total_screen_time as string | undefined;
   const totalMinutes = meta.total_minutes as number | undefined;
-  
+  // 睡眠时间
   const sleepTime = meta.sleep_time as string | undefined;
   const wakeTime = meta.wake_time as string | undefined;
-  const durationHours = meta.duration_hours as number | undefined;
-  const sleepScore = meta.score as number | undefined;
-  
-  const foodItems = meta.food_items as Array<{name: string; calories?: number}> | undefined;
-  const totalCalories = meta.total_calories as number | undefined;
-  const isHealthy = meta.is_healthy as boolean | undefined;
+  const deepSleepHours = meta.deep_sleep_hours as number | undefined;
+  const remHours = meta.rem_hours as number | undefined;
+
+  // 导航到详情页
+  const goToDetail = () => {
+    if (!isPending) {
+      router.push(`/record/${item.id}`);
+    }
+  };
 
   return (
-    <div 
-      ref={cardRef}
-      className={`rounded-2xl overflow-hidden transition-colors ${
+    <div ref={cardRef} className="flex gap-4">
+      {/* 左侧时间轴 */}
+      <div className="flex flex-col items-center">
+        {/* 时间轴节点 */}
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          isPending ? 'bg-indigo-500/20' : config.bgColor
+        } border-2 ${isPending ? 'border-indigo-500/40' : 'border-white/10'}`}>
+          {isPending ? (
+            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <span className={config.color}>{config.icon}</span>
+          )}
+        </div>
+        {/* 连接线 */}
+        {!isLast && (
+          <div className="w-0.5 flex-1 min-h-[20px] bg-gradient-to-b from-white/10 to-transparent" />
+        )}
+      </div>
+      
+      {/* 右侧内容 */}
+      <div className={`flex-1 pb-4 rounded-2xl overflow-hidden transition-colors ${
         isPending 
           ? 'bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20' 
-          : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/10'
-      }`}
-    >
-      <div className="p-4">
-        {/* 头部 */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isPending ? 'bg-indigo-500/20' : config.bgColor
-          }`}>
-            {isPending ? (
-              <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <span className={config.color}>{config.icon}</span>
+          : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/10 cursor-pointer'
+      }`}>
+        <div className="p-4">
+          {/* 头部：时间 + 分类 + 分数 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-white/40 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatTime(item.record_time || item.created_at)}
+            </span>
+            <span className={`text-xs font-medium ${isPending ? 'text-indigo-400' : config.color}`}>
+              {isPending ? '分析中...' : config.label}
+            </span>
+            {/* 分数标签 */}
+            {!isPending && (healthScore !== undefined || sleepScore !== undefined) && (
+              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                (healthScore || sleepScore || 0) >= 70 ? 'bg-green-500/10 text-green-400' : 
+                (healthScore || sleepScore || 0) >= 50 ? 'bg-yellow-500/10 text-yellow-400' : 
+                'bg-red-500/10 text-red-400'
+              }`}>
+                {healthScore || sleepScore}分
+              </span>
+            )}
+            {/* 睡眠时长 */}
+            {!isPending && category === 'SLEEP' && durationHours && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300">
+                {durationHours.toFixed(1)}h
+              </span>
+            )}
+            {/* 屏幕时间 */}
+            {!isPending && category === 'SCREEN' && (totalScreenTime || totalMinutes) && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">
+                {totalScreenTime || `${Math.floor((totalMinutes || 0) / 60)}h${(totalMinutes || 0) % 60}m`}
+              </span>
+            )}
+            {/* 查看详情箭头 */}
+            {!isPending && (
+              <ChevronRight className="w-4 h-4 text-white/20 ml-auto" />
             )}
           </div>
-          
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${isPending ? 'text-indigo-400' : config.color}`}>
-                {isPending ? '分析中...' : config.label}
-              </span>
-              {trend && !isPending && (
-                <span className={`flex items-center text-xs ${
-                  trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-white/30'
-                }`}>
-                  {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-                  {trend === 'down' && <TrendingDown className="w-3 h-3" />}
+
+          {/* 睡眠详细信息 */}
+          {!isPending && category === 'SLEEP' && (sleepTime || wakeTime || deepSleepHours) && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-xs text-white/50">
+              {sleepTime && (
+                <span className="flex items-center gap-1">
+                  <Moon className="w-3 h-3 text-indigo-400" />
+                  入睡 {sleepTime}
                 </span>
               )}
-              {healthScore !== undefined && !isPending && (
-                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  healthScore >= 70 ? 'bg-green-500/10 text-green-400' : 
-                  healthScore >= 50 ? 'bg-yellow-500/10 text-yellow-400' : 
-                  'bg-red-500/10 text-red-400'
-                }`}>
-                  {healthScore}分
+              {wakeTime && (
+                <span className="flex items-center gap-1">
+                  <span className="text-amber-400">☀️</span>
+                  苏醒 {wakeTime}
                 </span>
               )}
+              {deepSleepHours && (
+                <span>深睡 {deepSleepHours.toFixed(1)}h</span>
+              )}
+              {remHours && (
+                <span>REM {remHours.toFixed(1)}h</span>
+              )}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-white/30 mt-0.5">
-              <Clock className="w-3 h-3" />
-              <span>{formatTime(item.created_at)}</span>
-            </div>
-          </div>
-        </div>
+          )}
 
-        {/* Pending 显示原始输入 */}
-        {isPending && item.raw_content && (
-          <p className="text-sm text-white/70 mb-3">{item.raw_content}</p>
-        )}
-        
-        {isPending && (
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
-            <span className="text-sm text-indigo-400/80">AI 正在分析...</span>
-          </div>
-        )}
-
-        {/* AI 洞察 */}
-        {!isPending && item.ai_insight && (
-          <p className="text-[15px] text-white/80 leading-relaxed mb-3">{item.ai_insight}</p>
-        )}
-
-        {/* 屏幕时间 */}
-        {!isPending && category === 'SCREEN' && (
-          <div className="space-y-3">
-            {(totalScreenTime || totalMinutes) && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                <span className="text-sm text-white/50">总屏幕时间</span>
-                <span className="text-lg font-semibold text-blue-400">
-                  {totalScreenTime || `${Math.floor((totalMinutes || 0) / 60)}h${(totalMinutes || 0) % 60}m`}
-                </span>
-              </div>
+          {/* 可点击区域 */}
+          <div onClick={goToDetail}>
+            {/* 原始内容 - 显示更多内容 */}
+            {item.raw_content && !item.raw_content.startsWith('/') && !item.raw_content.includes('/Users/') && (
+              <p className="text-[15px] text-white/90 leading-relaxed mb-2">
+                {item.raw_content.length > 150 ? item.raw_content.slice(0, 150) + '...' : item.raw_content}
+              </p>
+            )}
+            {/* 如果没有原始内容但有分析，显示摘要 */}
+            {(!item.raw_content || item.raw_content.includes('/Users/')) && meta.analysis && (
+              <p className="text-[15px] text-white/90 leading-relaxed mb-2">
+                {(meta.analysis as string).slice(0, 120)}...
+              </p>
             )}
             
-            {topApps && topApps.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-xs text-white/40">
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  <span>App 使用排行</span>
+            {/* Pending 状态 */}
+            {isPending && (
+              <div className="flex items-center gap-2 text-sm text-indigo-400/80">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                <span>AI 正在分析...</span>
+              </div>
+            )}
+
+            {/* AI 洞察 - 完整显示 */}
+            {!isPending && item.ai_insight && item.ai_insight !== '已记录' && (
+              <div className="flex items-start gap-2 mt-2 p-2.5 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                <Sparkles className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-white/60 leading-relaxed">{item.ai_insight}</p>
+              </div>
+            )}
+
+            {/* AI 深度分析 - 显示摘要，点击查看完整 */}
+            {!isPending && analysis && (
+              <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <div className="flex items-center gap-1 text-xs text-white/40 mb-1">
+                  <Lightbulb className="w-3 h-3" />
+                  <span>AI 分析</span>
                 </div>
-                <div className="space-y-1.5">
-                  {topApps.slice(0, 5).map((app, idx) => (
-                    <div key={`${app.name}-${idx}`} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.02]">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                        idx === 0 ? 'bg-amber-500/20 text-amber-400' :
-                        idx === 1 ? 'bg-slate-400/20 text-slate-300' :
-                        idx === 2 ? 'bg-orange-600/20 text-orange-400' :
-                        'bg-white/5 text-white/40'
-                      }`}>
-                        {idx + 1}
-                      </span>
-                      <span className="flex-1 text-sm text-white/70">{app.name}</span>
-                      <span className="text-sm text-white/40">{app.time}</span>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-xs text-white/50 leading-relaxed line-clamp-3">
+                  {analysis.length > 200 ? analysis.slice(0, 200) + '...' : analysis}
+                </p>
+                {suggestions && suggestions.length > 0 && (
+                  <p className="text-xs text-amber-400/60 mt-1.5">
+                    💡 {suggestions[0].slice(0, 50)}{suggestions[0].length > 50 ? '...' : ''}
+                  </p>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        {/* 睡眠数据 */}
-        {!isPending && category === 'SLEEP' && (sleepTime || durationHours) && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            {sleepTime && (
-              <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
-                <p className="text-xs text-white/40 mb-1">入睡</p>
-                <p className="text-base font-medium text-indigo-300">{sleepTime}</p>
-              </div>
-            )}
-            {wakeTime && (
-              <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
-                <p className="text-xs text-white/40 mb-1">起床</p>
-                <p className="text-base font-medium text-indigo-300">{wakeTime}</p>
-              </div>
-            )}
-            {durationHours && (
-              <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
-                <p className="text-xs text-white/40 mb-1">时长</p>
-                <p className="text-base font-medium text-indigo-300">{durationHours.toFixed(1)}h</p>
-              </div>
-            )}
-            {sleepScore && (
-              <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
-                <p className="text-xs text-white/40 mb-1">质量</p>
-                <p className={`text-base font-medium ${
-                  sleepScore >= 80 ? 'text-green-400' : sleepScore >= 60 ? 'text-yellow-400' : 'text-red-400'
-                }`}>{sleepScore}分</p>
-              </div>
-            )}
-          </div>
-        )}
+          {/* 临时图片 */}
+          {isPending && item._tempImagePreview && (
+            <div className="mt-2">
+              <img src={item._tempImagePreview} alt="" className="h-20 w-auto rounded-lg opacity-60" />
+            </div>
+          )}
 
-        {/* 食物数据 */}
-        {!isPending && category === 'DIET' && (foodItems || totalCalories) && (
-          <div className="space-y-2 mb-3">
-            {foodItems && foodItems.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {foodItems.map((food, idx) => (
-                  <span key={`${food.name}-${idx}`} className="px-2.5 py-1 text-xs rounded-lg bg-orange-500/10 text-orange-300 border border-orange-500/10">
-                    {food.name}
-                    {food.calories && <span className="ml-1 text-orange-400/60">{food.calories}卡</span>}
+          {/* 保存的图片 */}
+          {!isPending && item.image_saved && item.thumbnail_path && (
+            <button onClick={(e) => { e.stopPropagation(); setShowImage(true); }} className="mt-2 relative group">
+              <img src={item.thumbnail_path} alt="" className="h-20 w-auto rounded-lg opacity-80 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <ImageIcon className="w-4 h-4 text-white" />
+              </div>
+            </button>
+          )}
+
+          {/* 底部操作栏 */}
+          {!isPending && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+              {/* 标签 */}
+              <div className="flex flex-wrap gap-1 flex-1">
+                {item.tags && item.tags.slice(0, 3).map((tag, idx) => (
+                  <span key={idx} className="px-1.5 py-0.5 text-[10px] rounded bg-white/[0.04] text-white/30">
+                    {tag}
                   </span>
                 ))}
               </div>
-            )}
-            {(totalCalories || isHealthy !== undefined) && (
-              <div className="flex items-center gap-3 text-sm">
-                {totalCalories && (
-                  <span className="text-white/50">
-                    <Zap className="w-3.5 h-3.5 inline mr-1 text-orange-400" />
-                    约 {totalCalories} 卡
-                  </span>
-                )}
-                {isHealthy !== undefined && (
-                  <span className={isHealthy ? 'text-green-400' : 'text-orange-400'}>
-                    <Heart className={`w-3.5 h-3.5 inline mr-1 ${isHealthy ? 'fill-green-400' : ''}`} />
-                    {isHealthy ? '健康' : '需注意'}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 临时图片 */}
-        {isPending && item._tempImagePreview && (
-          <div className="mt-3">
-            <img src={item._tempImagePreview} alt="" className="h-24 w-auto rounded-xl opacity-60" />
-          </div>
-        )}
-
-        {/* 保存的图片 */}
-        {!isPending && item.image_saved && item.thumbnail_path && (
-          <button onClick={() => setShowImage(true)} className="mt-3 relative group">
-            <img src={item.thumbnail_path} alt="" className="h-24 w-auto rounded-xl opacity-80 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
-              <ImageIcon className="w-5 h-5 text-white" />
+              {/* 查看详情 & 对话按钮 */}
+              <button
+                onClick={goToDetail}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs text-indigo-400/70 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>详情 & 对话</span>
+              </button>
             </div>
-          </button>
-        )}
-
-        {/* AI 分析 */}
-        {!isPending && analysis && (
-          <div className="mt-3 p-3 rounded-xl bg-gradient-to-br from-violet-500/5 to-indigo-500/5 border border-violet-500/10">
-            <div className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-white/60 leading-relaxed">{analysis}</p>
-            </div>
-          </div>
-        )}
-
-        {/* AI 建议 */}
-        {!isPending && suggestions && suggestions.length > 0 && (
-          <div className="mt-2 space-y-1.5">
-            {suggestions.slice(0, 2).map((s, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-sm">
-                <Lightbulb className="w-4 h-4 text-amber-400/70 mt-0.5 flex-shrink-0" />
-                <span className="text-white/50">{s}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 标签 */}
-        {!isPending && item.tags && item.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/[0.04]">
-            {item.tags.slice(0, 4).map((tag, idx) => (
-              <span key={idx} className="px-2 py-0.5 text-[11px] rounded-full bg-white/[0.04] text-white/40">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 图片模态框 */}
@@ -336,13 +281,9 @@ const FeedCard = memo(function FeedCard({ item }: { item: FeedItem }) {
     </div>
   );
 }, (prevProps, nextProps) => {
-  // memo 比较：只有关键字段变化才重新渲染
   const p = prevProps.item;
   const n = nextProps.item;
-  return p.id === n.id && 
-         p._pending === n._pending && 
-         p.ai_insight === n.ai_insight &&
-         p.category === n.category;
+  return p.id === n.id && p._pending === n._pending && p.ai_insight === n.ai_insight;
 });
 
 // ========== 主组件 ==========
@@ -354,15 +295,29 @@ export default function FeedHistory({ items }: FeedHistoryProps) {
     return filter ? items.filter(i => i.category === filter) : items;
   }, [items, filter]);
   
-  // 分组
+  // 分组并按实际发生时间排序
   const grouped = useMemo(() => {
     const map = new Map<string, FeedItem[]>();
     filtered.forEach(item => {
-      const key = new Date(item.created_at).toISOString().split('T')[0];
+      // 优先使用 record_time（实际发生时间），其次用 created_at（提交时间）
+      const timeToUse = item.record_time || item.created_at;
+      const key = new Date(timeToUse).toISOString().split('T')[0];
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     });
-    return Array.from(map.entries());
+    
+    // 每组内按实际发生时间降序排序（最新的在前）
+    map.forEach((items, key) => {
+      items.sort((a, b) => {
+        const timeA = new Date(a.record_time || a.created_at).getTime();
+        const timeB = new Date(b.record_time || b.created_at).getTime();
+        return timeB - timeA;
+      });
+      map.set(key, items);
+    });
+    
+    // 日期组按日期降序排序
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filtered]);
   
   const categories = ['SLEEP', 'DIET', 'ACTIVITY', 'MOOD', 'SCREEN'];
@@ -399,20 +354,24 @@ export default function FeedHistory({ items }: FeedHistoryProps) {
         })}
       </div>
 
-      {/* 关键改动3: 移除"详情"按钮 - 所有数据直接展示 */}
+      {/* 时间轴列表 */}
       {grouped.length > 0 ? (
         grouped.map(([dateKey, dayItems]) => {
           const { title, subtitle } = formatDateHeader(dateKey);
           return (
             <div key={dateKey} className="mb-8">
-              <div className="flex items-baseline gap-2 mb-3 px-1">
+              <div className="flex items-baseline gap-2 mb-4 px-1">
                 <h3 className="text-lg font-semibold text-white/90">{title}</h3>
                 <span className="text-xs text-white/30">{subtitle}</span>
                 <span className="text-xs text-white/20 ml-auto">{dayItems.filter(i => !i._pending).length} 条</span>
               </div>
-              <div className="space-y-3">
-                {dayItems.map((item) => (
-                  <FeedCard key={item.id} item={item} />
+              <div className="pl-1">
+                {dayItems.map((item, idx) => (
+                  <TimelineCard 
+                    key={item.id} 
+                    item={item} 
+                    isLast={idx === dayItems.length - 1} 
+                  />
                 ))}
               </div>
             </div>

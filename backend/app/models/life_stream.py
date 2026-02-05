@@ -62,7 +62,8 @@ class LifeStream(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="唯一标识")
     user_id = Column(String(36), nullable=True, comment="用户ID(为未来多用户预留)")
-    created_at = Column(DateTime, server_default=func.now(), comment="发生时间")
+    created_at = Column(DateTime, server_default=func.now(), comment="提交时间")
+    record_time = Column(DateTime, nullable=True, comment="实际发生时间（AI分析得出）")
     input_type = Column(String(20), nullable=False, comment="输入类型")
     category = Column(String(20), nullable=True, comment="分类")
     raw_content = Column(Text, nullable=True, comment="文字内容或图片URL")

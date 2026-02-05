@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   Sparkles, TrendingUp, TrendingDown, Minus, 
-  Lightbulb, AlertCircle, Star, RefreshCw 
+  Lightbulb, AlertCircle, Star, RefreshCw, Clock
 } from 'lucide-react';
 
 interface Insight {
@@ -29,6 +29,11 @@ interface WeeklyAnalysis {
   overall_score?: number;
 }
 
+interface CachedData {
+  data: WeeklyAnalysis;
+  timestamp: number;
+}
+
 interface Props {
   className?: string;
 }
@@ -39,42 +44,181 @@ const priorityColors = {
   low: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 };
 
+const CACHE_KEY = 'ai_weekly_analysis_cache';
+const CACHE_DURATION = 60 * 60 * 1000; // 1小时缓存
+
 export default function AIWeeklyAnalysis({ className = '' }: Props) {
   const [data, setData] = useState<WeeklyAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState(false);
 
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async (forceRefresh = false) => {
+    setError(false);
+    
+    // 检查缓存（除非强制刷新）
+    if (!forceRefresh) {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data: cachedData, timestamp }: CachedData = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          
+          // 缓存有效（1小时内）
+          if (age < CACHE_DURATION) {
+            setData(cachedData);
+            setLastUpdated(new Date(timestamp));
+            setLoading(false);
+            setInitialized(true);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Cache read error:', e);
+      }
+    }
+
+    // 从 API 获取
+    setLoading(true);
     try {
       const res = await fetch('/api/ai/weekly-analysis');
       if (res.ok) {
         const analysis = await res.json();
         setData(analysis);
+        
+        // 保存到缓存
+        const cacheData: CachedData = {
+          data: analysis,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        setLastUpdated(new Date());
+      } else {
+        setError(true);
       }
-    } catch (error) {
-      console.error('Failed to fetch AI analysis:', error);
+    } catch (err) {
+      console.error('Failed to fetch AI analysis:', err);
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setInitialized(true);
     }
-  };
+  }, []);
 
+  // 只在组件挂载时检查缓存，不自动请求 API
   useEffect(() => {
-    fetchAnalysis();
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data: cachedData, timestamp }: CachedData = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+        if (age < CACHE_DURATION) {
+          setData(cachedData);
+          setLastUpdated(new Date(timestamp));
+          setInitialized(true);
+        }
+      }
+    } catch (e) {
+      console.error('Cache read error:', e);
+    }
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchAnalysis();
+    fetchAnalysis(true); // 手动刷新强制重新获取
+  };
+  
+  const handleGenerate = () => {
+    fetchAnalysis(true); // 首次生成
+  };
+  
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return '';
+    const now = new Date();
+    const diff = now.getTime() - lastUpdated.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '刚刚更新';
+    if (minutes < 60) return `${minutes}分钟前更新`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时前更新`;
+    return lastUpdated.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' 更新';
   };
 
-  if (loading) {
+  // 未初始化且没有缓存 - 显示生成按钮
+  if (!initialized && !data) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-24 bg-white/5 rounded mb-4"></div>
-          <div className="h-16 bg-white/5 rounded"></div>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-5 h-5 text-violet-400" />
+          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+        </div>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-3">📊</div>
+          <p className="text-white/50 mb-4">点击生成本周 AI 分析报告</p>
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="px-4 py-2 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                生成中...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                生成分析
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 加载中
+  if (loading && !data) {
+    return (
+      <div className={`glass-card p-6 ${className}`}>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-5 h-5 text-violet-400" />
+          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+        </div>
+        <div className="text-center py-8">
+          <RefreshCw className="w-8 h-8 text-violet-400 animate-spin mx-auto mb-3" />
+          <p className="text-white/50">正在生成分析...</p>
+          <p className="text-xs text-white/30 mt-1">AI 正在分析你的生活数据</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 错误状态 - 显示重试按钮
+  if (error && !data) {
+    return (
+      <div className={`glass-card p-6 ${className}`}>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-5 h-5 text-violet-400" />
+          <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+        </div>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-3">😅</div>
+          <p className="text-white/60 mb-2">生成失败</p>
+          <p className="text-xs text-white/40 mb-4">可能是网络问题或 AI 服务繁忙</p>
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="px-4 py-2 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              重试
+            </span>
+          </button>
         </div>
       </div>
     );
@@ -117,11 +261,18 @@ export default function AIWeeklyAnalysis({ className = '' }: Props) {
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-violet-400" />
           <h3 className="text-lg font-semibold text-white/90">AI 周度分析</h3>
+          {lastUpdated && (
+            <span className="text-[10px] text-white/30 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatLastUpdated()}
+            </span>
+          )}
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
           className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-colors"
+          title="重新生成分析"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
         </button>

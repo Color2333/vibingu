@@ -6,7 +6,8 @@ Feed API - 智能多模态数据投喂
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel
 import base64
 import os
 
@@ -42,6 +43,40 @@ image_storage = ImageStorage(upload_dir="uploads")
 tagger = get_tagger()
 dimension_analyzer = get_dimension_analyzer()
 
+
+# ========== Pydantic Models ==========
+class RecordChatRequest(BaseModel):
+    """记录对话请求"""
+    message: str
+    history: Optional[List[dict]] = None  # [{"role": "user/assistant", "content": "..."}]
+
+
+class RecordChatResponse(BaseModel):
+    """记录对话响应"""
+    reply: str
+    suggestions: Optional[List[str]] = None
+
+
+def _generate_follow_up_suggestions(category: str) -> List[str]:
+    """根据分类生成跟进问题建议"""
+    base_suggestions = ["这条记录对我有什么启示？", "有什么改进建议吗？"]
+    
+    category_suggestions = {
+        "SLEEP": ["我的睡眠质量如何？", "如何改善睡眠？"],
+        "DIET": ["这顿饭营养均衡吗？", "有什么饮食建议？"],
+        "ACTIVITY": ["这次运动效果怎么样？", "还能做什么运动？"],
+        "MOOD": ["这种情绪是怎么产生的？", "如何保持好心情？"],
+        "SCREEN": ["屏幕时间合理吗？", "如何减少屏幕依赖？"],
+        "SOCIAL": ["这次社交有什么收获？", "如何提升社交质量？"],
+        "WORK": ["工作效率如何？", "如何提高工作状态？"],
+        "GROWTH": ["学到了什么？", "如何持续成长？"],
+        "LEISURE": ["这次休闲放松了吗？", "还有什么休闲方式推荐？"],
+    }
+    
+    return category_suggestions.get(category, base_suggestions)[:3]
+
+
+# ========== Routes ==========
 
 @router.post("", response_model=FeedResponse)
 async def create_feed(
@@ -159,6 +194,9 @@ async def create_feed(
         tags=tags,
     )
     
+    # 确定记录发生时间
+    record_time = extract_result.get("record_time")  # AI 分析得出的实际发生时间
+    
     # 存入数据库
     life_stream = LifeStream(
         input_type=input_type,
@@ -172,6 +210,7 @@ async def create_feed(
         image_saved=image_path is not None,
         tags=tags,
         dimension_scores=dimension_scores,
+        record_time=record_time,  # AI 分析的实际发生时间
     )
     
     db.add(life_stream)
@@ -206,6 +245,7 @@ async def create_feed(
         meta_data=meta_data,
         ai_insight=extract_result.get("reply_text", "已记录"),
         created_at=life_stream.created_at,
+        record_time=life_stream.record_time or life_stream.created_at,  # 实际发生时间
         image_saved=life_stream.image_saved,
         image_path=f"/api/feed/image/{image_path}" if image_path else None,
         thumbnail_path=f"/api/feed/image/{thumbnail_path}" if thumbnail_path else None,
@@ -213,6 +253,8 @@ async def create_feed(
         dimension_scores=dimension_scores,
     )
 
+
+# ========== 静态路由（必须在动态路由之前） ==========
 
 @router.get("/history")
 async def get_history(
@@ -228,6 +270,7 @@ async def get_history(
     - **offset**: 偏移量
     - **category**: 筛选分类
     """
+    # 按提交时间排序（最新提交的在前）
     query = db.query(LifeStream).order_by(LifeStream.created_at.desc())
     
     if category:
@@ -244,6 +287,7 @@ async def get_history(
             "meta_data": r.meta_data,
             "ai_insight": r.ai_insight,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "record_time": r.record_time.isoformat() if r.record_time else (r.created_at.isoformat() if r.created_at else None),
             "image_saved": r.image_saved,
             "image_type": r.image_type,
             "image_path": f"/api/feed/image/{r.image_path}" if r.image_path else None,
@@ -285,3 +329,123 @@ async def get_feed_stats(db: Session = Depends(get_db)):
         "records_with_images": with_images,
         "storage": storage_stats,
     }
+
+
+# ========== 动态路由 ==========
+
+@router.get("/{record_id}")
+async def get_record_detail(
+    record_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    获取单条记录详情
+    
+    - **record_id**: 记录 ID
+    """
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    return {
+        "id": str(record.id),
+        "input_type": record.input_type,
+        "category": record.category,
+        "raw_content": record.raw_content,
+        "meta_data": record.meta_data,
+        "ai_insight": record.ai_insight,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "record_time": record.record_time.isoformat() if record.record_time else (record.created_at.isoformat() if record.created_at else None),
+        "image_saved": record.image_saved,
+        "image_type": record.image_type,
+        "image_path": f"/api/feed/image/{record.image_path}" if record.image_path else None,
+        "thumbnail_path": f"/api/feed/image/{record.thumbnail_path}" if record.thumbnail_path else None,
+        "tags": record.tags,
+        "dimension_scores": record.dimension_scores,
+    }
+
+
+@router.post("/{record_id}/chat", response_model=RecordChatResponse)
+async def chat_with_record(
+    record_id: str,
+    request: RecordChatRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    与单条记录进行 AI 对话
+    
+    - **record_id**: 记录 ID
+    - **message**: 用户消息
+    - **history**: 对话历史（可选）
+    """
+    from app.services.ai_client import get_ai_client
+    
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    # 构建记录上下文
+    actual_time = record.record_time or record.created_at
+    record_context = f"""
+这是一条生活记录的详情：
+- 分类: {record.category}
+- 发生时间: {actual_time.strftime('%Y-%m-%d %H:%M') if actual_time else '未知'}
+- 提交时间: {record.created_at.strftime('%Y-%m-%d %H:%M') if record.created_at else '未知'}
+- 原始内容: {record.raw_content or '无'}
+- AI 洞察: {record.ai_insight or '无'}
+- 详细分析: {record.meta_data.get('analysis', '无') if record.meta_data else '无'}
+- 建议: {', '.join(record.meta_data.get('suggestions', [])) if record.meta_data and record.meta_data.get('suggestions') else '无'}
+- 标签: {', '.join(record.tags) if record.tags else '无'}
+"""
+    
+    # 构建对话
+    messages = [
+        {
+            "role": "system",
+            "content": f"""你是一个专注于健康和生活方式的 AI 助手。用户正在查看他们的一条生活记录，并想与你讨论这条记录。
+请基于记录内容回答用户的问题，给出有建设性的建议和洞察。
+保持回复简洁友好，使用中文回答。
+
+{record_context}"""
+        }
+    ]
+    
+    # 添加历史对话
+    if request.history:
+        for msg in request.history[-6:]:  # 最多保留最近6条
+            messages.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+    
+    # 添加当前消息
+    messages.append({
+        "role": "user",
+        "content": request.message
+    })
+    
+    try:
+        ai_client = get_ai_client()
+        response = await ai_client.chat_completion(
+            messages=messages,
+            task_type="record_chat",
+            task_description=f"与记录 {record_id} 对话",
+            record_id=record_id,
+        )
+        reply = response.get("content", "抱歉，我暂时无法回答这个问题。")
+        
+        # 生成建议问题
+        suggestions = _generate_follow_up_suggestions(record.category)
+        
+        return RecordChatResponse(
+            reply=reply,
+            suggestions=suggestions
+        )
+    except Exception as e:
+        print(f"AI 对话失败: {e}")
+        return RecordChatResponse(
+            reply="抱歉，AI 服务暂时不可用，请稍后再试。",
+            suggestions=None
+        )
