@@ -5,11 +5,18 @@
 2. 异常模式检测 - 识别偏离正常模式的行为
 3. 因果归因分析 - 分析影响状态的关键因素
 4. What-if 模拟 - 模拟不同行为的影响
+
+增强版 v0.2:
+- AI 驱动的预测分析
+- 更精准的异常检测
+- 个性化健康建议
+- 智能风险评估
 """
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 import statistics
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -896,6 +903,201 @@ class Predictor:
                 }
         
         return None
+    
+    # ========== AI 增强功能 v0.2 ==========
+    
+    async def ai_predict_tomorrow(self) -> Dict[str, Any]:
+        """
+        AI 驱动的次日预测
+        
+        结合历史数据和 AI 分析，给出更精准的预测
+        """
+        from app.services.ai_client import get_ai_client, AIClientError
+        
+        # 获取基础预测
+        base_prediction = self.predict_tomorrow_vibe()
+        
+        # 获取最近的记录摘要
+        recent_summary = self._get_recent_summary(7)
+        
+        if not recent_summary["has_data"]:
+            return {
+                **base_prediction,
+                "ai_enhanced": False,
+                "message": "数据不足，使用基础预测"
+            }
+        
+        try:
+            ai_client = get_ai_client()
+            
+            prompt = f"""基于以下用户数据，预测明天的状态并给出建议。
+
+基础预测分数: {base_prediction['predicted_score']}
+近7天数据摘要:
+{json.dumps(recent_summary, ensure_ascii=False, indent=2)}
+
+请分析:
+1. 基于数据模式，明天状态的可能范围
+2. 影响明天状态的关键因素
+3. 提升明天状态的具体建议
+
+返回JSON格式:
+{{
+    "adjusted_score": 预测分数（保持原分数或微调），
+    "confidence": "high/medium/low",
+    "key_factors": ["因素1", "因素2"],
+    "improvement_tips": ["建议1", "建议2"],
+    "risk_factors": ["风险1"] 或 [],
+    "morning_suggestion": "早晨的一句话建议"
+}}"""
+            
+            result = await ai_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": "你是一个生活状态预测专家。基于用户的历史数据模式进行预测。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=600,
+                task_type="ai_prediction",
+                task_description="AI 次日预测",
+                json_response=True,
+            )
+            
+            ai_result = result["content"]
+            
+            if isinstance(ai_result, dict):
+                return {
+                    **base_prediction,
+                    "ai_enhanced": True,
+                    "ai_analysis": ai_result,
+                    "predicted_score": ai_result.get("adjusted_score", base_prediction["predicted_score"]),
+                }
+            else:
+                raise ValueError("AI 返回格式错误")
+                
+        except Exception as e:
+            print(f"AI 预测错误: {e}")
+            return {
+                **base_prediction,
+                "ai_enhanced": False,
+                "error": str(e)
+            }
+    
+    async def ai_detect_risks(self) -> Dict[str, Any]:
+        """
+        AI 驱动的风险检测
+        
+        分析近期数据，识别潜在的健康风险
+        """
+        from app.services.ai_client import get_ai_client, AIClientError
+        
+        # 获取健康提醒
+        alerts = self.get_health_alerts()
+        
+        # 获取异常检测
+        anomalies = self.detect_anomalies(14)
+        
+        # 获取近期数据摘要
+        recent_summary = self._get_recent_summary(14)
+        
+        if not recent_summary["has_data"]:
+            return {
+                "has_data": False,
+                "alerts": alerts,
+                "message": "数据不足"
+            }
+        
+        try:
+            ai_client = get_ai_client()
+            
+            prompt = f"""分析以下用户数据，识别潜在的健康风险和需要关注的模式。
+
+系统检测到的告警: {json.dumps(alerts, ensure_ascii=False)}
+异常检测结果: {json.dumps(anomalies.get('anomalies', [])[:5], ensure_ascii=False)}
+近期数据摘要: {json.dumps(recent_summary, ensure_ascii=False)}
+
+请分析:
+1. 综合风险评估
+2. 需要立即关注的问题
+3. 长期需要注意的趋势
+4. 预防建议
+
+返回JSON格式:
+{{
+    "risk_level": "low/medium/high",
+    "risk_score": 0-100,
+    "immediate_concerns": ["关注点1", "关注点2"] 或 [],
+    "long_term_trends": ["趋势1", "趋势2"] 或 [],
+    "preventive_suggestions": ["建议1", "建议2"],
+    "positive_notes": ["积极方面1", "积极方面2"]
+}}"""
+            
+            result = await ai_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": "你是一个健康风险分析专家。提供客观、有建设性的分析，避免过度担忧。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=600,
+                task_type="risk_detection",
+                task_description="AI 风险检测",
+                json_response=True,
+            )
+            
+            ai_result = result["content"]
+            
+            if isinstance(ai_result, dict):
+                return {
+                    "has_data": True,
+                    "ai_analysis": ai_result,
+                    "system_alerts": alerts,
+                    "anomaly_count": anomalies.get("anomaly_count", 0)
+                }
+            else:
+                raise ValueError("AI 返回格式错误")
+                
+        except Exception as e:
+            print(f"AI 风险检测错误: {e}")
+            return {
+                "has_data": True,
+                "ai_analysis": None,
+                "system_alerts": alerts,
+                "error": str(e)
+            }
+    
+    def _get_recent_summary(self, days: int) -> Dict[str, Any]:
+        """获取近期数据摘要"""
+        start_date = datetime.now() - timedelta(days=days)
+        
+        records = self.db.query(LifeStream).filter(
+            LifeStream.created_at >= start_date
+        ).all()
+        
+        if len(records) < 5:
+            return {"has_data": False}
+        
+        # 统计各类别
+        category_counts = defaultdict(int)
+        dimension_scores = defaultdict(list)
+        
+        for r in records:
+            if r.category:
+                category_counts[r.category] += 1
+            if r.dimension_scores:
+                for dim, score in r.dimension_scores.items():
+                    dimension_scores[dim].append(score)
+        
+        # 计算维度平均分
+        dim_avgs = {}
+        for dim, scores in dimension_scores.items():
+            if scores:
+                dim_avgs[dim] = round(sum(scores) / len(scores), 1)
+        
+        return {
+            "has_data": True,
+            "period_days": days,
+            "total_records": len(records),
+            "category_distribution": dict(category_counts),
+            "dimension_averages": dim_avgs,
+        }
 
 
 # 全局单例

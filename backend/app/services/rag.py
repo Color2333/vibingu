@@ -4,14 +4,23 @@
 1. 将生活记录向量化并索引
 2. 支持语义搜索
 3. 结合 LLM 生成个性化回答
+
+增强版 v0.2:
+- 时间感知的上下文构建
+- 对话历史支持
+- 智能摘要生成
+- 主题聚合分析
 """
 import os
-from typing import Dict, Any, List, Optional
+import json
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
+from collections import defaultdict
 import chromadb
 from chromadb.config import Settings
 from openai import OpenAI
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from app.database import SessionLocal
 from app.models import LifeStream
@@ -415,6 +424,278 @@ class RAGService:
             return {"status": "cleared", "count": 0}
         except Exception as e:
             return {"error": str(e)}
+    
+    # ========== 增强功能 v0.2 ==========
+    
+    def ask_with_context(
+        self, 
+        question: str, 
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        n_context: int = 7
+    ) -> Dict[str, Any]:
+        """
+        增强版 RAG 问答 - 支持对话历史
+        
+        Args:
+            question: 用户问题
+            conversation_history: 之前的对话历史 [{"role": "user/assistant", "content": "..."}]
+            n_context: 检索的上下文数量
+        """
+        try:
+            # 1. 检索相关上下文
+            search_results = self.search(question, n_results=n_context)
+            
+            # 2. 获取时间上下文
+            time_context = self._get_time_context()
+            
+            # 3. 构建上下文
+            if not search_results:
+                context = "暂无相关历史记录。"
+            else:
+                context_parts = []
+                for i, r in enumerate(search_results, 1):
+                    context_parts.append(f"[记录 {i}]\n{r['document']}")
+                context = "\n\n".join(context_parts)
+            
+            # 4. 构建消息
+            system_prompt = f"""你是一个智能的个人生活助手，能够基于用户的历史生活记录回答问题、提供洞察和建议。
+
+当前时间背景：
+{time_context}
+
+规则：
+1. 基于提供的历史记录回答问题，不要编造不存在的信息
+2. 如果记录中没有相关信息，诚实地说"根据现有记录无法确定"
+3. 可以发现模式、趋势，给出有洞察力的分析
+4. 回答要简洁、友好、有帮助
+5. 使用中文回答
+6. 如果用户问的是一般性问题而非关于历史记录，也可以正常回答"""
+            
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # 添加对话历史
+            if conversation_history:
+                for msg in conversation_history[-6:]:  # 最多保留6轮历史
+                    messages.append(msg)
+            
+            # 添加当前问题（包含上下文）
+            user_prompt = f"""用户问题: {question}
+
+相关生活记录：
+{context}
+
+请回答用户的问题。"""
+            
+            messages.append({"role": "user", "content": user_prompt})
+            
+            # 5. 调用 LLM
+            response = self.openai_client.chat.completions.create(
+                model=self.smart_model,
+                messages=messages,
+                max_tokens=800,
+                temperature=0.7
+            )
+            
+            answer = response.choices[0].message.content
+            
+            return {
+                "answer": answer,
+                "sources": [
+                    {
+                        "date": r["metadata"].get("date", ""),
+                        "category": r["metadata"].get("category", ""),
+                        "relevance": round(r["relevance"], 2),
+                        "preview": r["document"][:100] + "..." if len(r["document"]) > 100 else r["document"]
+                    }
+                    for r in search_results
+                ],
+                "has_context": len(search_results) > 0,
+                "context_count": len(search_results)
+            }
+            
+        except Exception as e:
+            print(f"RAG 问答失败: {e}")
+            return {
+                "answer": f"处理问题时出错，请稍后重试。",
+                "sources": [],
+                "has_context": False,
+                "error": str(e)
+            }
+    
+    def generate_topic_summary(self, topic: str, days: int = 30) -> Dict[str, Any]:
+        """
+        生成特定主题的摘要分析
+        
+        例如: "睡眠"、"运动"、"心情" 等
+        """
+        try:
+            # 搜索相关记录
+            search_results = self.search(topic, n_results=20)
+            
+            if not search_results:
+                return {
+                    "has_data": False,
+                    "message": f"没有找到与 '{topic}' 相关的记录"
+                }
+            
+            # 按日期分组
+            by_date: Dict[str, List[str]] = defaultdict(list)
+            for r in search_results:
+                date = r["metadata"].get("date", "unknown")
+                by_date[date].append(r["document"])
+            
+            # 构建摘要上下文
+            context_parts = []
+            for date in sorted(by_date.keys(), reverse=True)[:10]:
+                docs = by_date[date]
+                context_parts.append(f"[{date}]\n" + "\n".join(docs[:2]))
+            
+            context = "\n\n".join(context_parts)
+            
+            # 生成摘要
+            prompt = f"""基于以下关于"{topic}"的生活记录，生成一个简洁的分析摘要。
+
+记录：
+{context}
+
+请分析:
+1. 整体情况概述
+2. 发现的模式或趋势
+3. 值得注意的点
+4. 改进建议（如果适用）
+
+用简洁的中文回答，不要超过200字。"""
+            
+            response = self.openai_client.chat.completions.create(
+                model=self.smart_model,
+                messages=[
+                    {"role": "system", "content": "你是一个善于总结和分析的生活数据助手。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=400,
+                temperature=0.7
+            )
+            
+            return {
+                "has_data": True,
+                "topic": topic,
+                "summary": response.choices[0].message.content,
+                "record_count": len(search_results),
+                "date_range": {
+                    "earliest": min(by_date.keys()) if by_date else None,
+                    "latest": max(by_date.keys()) if by_date else None
+                }
+            }
+            
+        except Exception as e:
+            print(f"生成主题摘要失败: {e}")
+            return {"has_data": False, "error": str(e)}
+    
+    def get_life_insights(self, period_days: int = 30) -> Dict[str, Any]:
+        """
+        生成生活洞察报告
+        
+        综合分析最近一段时间的生活数据
+        """
+        try:
+            # 获取各维度数据
+            dimensions = ["睡眠", "饮食", "运动", "心情", "工作", "社交"]
+            insights = []
+            
+            for dim in dimensions:
+                results = self.search(dim, n_results=5)
+                if results:
+                    insights.append({
+                        "dimension": dim,
+                        "record_count": len(results),
+                        "recent_samples": [r["document"][:80] for r in results[:2]]
+                    })
+            
+            if not insights:
+                return {
+                    "has_data": False,
+                    "message": "数据不足，无法生成洞察报告"
+                }
+            
+            # 构建综合分析上下文
+            context_parts = []
+            for insight in insights:
+                context_parts.append(f"【{insight['dimension']}】({insight['record_count']}条记录)")
+                for sample in insight["recent_samples"]:
+                    context_parts.append(f"  - {sample}")
+            
+            context = "\n".join(context_parts)
+            
+            # 生成综合洞察
+            prompt = f"""基于以下生活数据摘要，生成一份简洁的个人生活洞察报告。
+
+数据摘要：
+{context}
+
+请分析:
+1. 生活状态整体评估（1-2句话）
+2. 做得好的地方
+3. 需要关注的地方
+4. 一个具体的行动建议
+
+用友好、简洁的中文回答。"""
+            
+            response = self.openai_client.chat.completions.create(
+                model=self.smart_model,
+                messages=[
+                    {"role": "system", "content": "你是一个关心用户健康和生活质量的智能助手。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            return {
+                "has_data": True,
+                "period_days": period_days,
+                "insights": response.choices[0].message.content,
+                "dimensions_analyzed": [i["dimension"] for i in insights],
+                "total_records": sum(i["record_count"] for i in insights)
+            }
+            
+        except Exception as e:
+            print(f"生成生活洞察失败: {e}")
+            return {"has_data": False, "error": str(e)}
+    
+    def _get_time_context(self) -> str:
+        """获取当前时间上下文"""
+        now = datetime.now()
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        
+        # 时段
+        hour = now.hour
+        if 5 <= hour < 9:
+            period = "早晨"
+        elif 9 <= hour < 12:
+            period = "上午"
+        elif 12 <= hour < 14:
+            period = "中午"
+        elif 14 <= hour < 18:
+            period = "下午"
+        elif 18 <= hour < 21:
+            period = "傍晚"
+        elif 21 <= hour < 24:
+            period = "晚间"
+        else:
+            period = "深夜"
+        
+        # 季节
+        month = now.month
+        if month in [3, 4, 5]:
+            season = "春季"
+        elif month in [6, 7, 8]:
+            season = "夏季"
+        elif month in [9, 10, 11]:
+            season = "秋季"
+        else:
+            season = "冬季"
+        
+        return f"现在是 {now.strftime('%Y年%m月%d日')} {weekday_names[now.weekday()]} {period}，{season}。"
 
 
 # 全局单例

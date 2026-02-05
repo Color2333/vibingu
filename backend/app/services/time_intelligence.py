@@ -5,11 +5,19 @@
 2. 周期识别 - 发现周/月/季节性规律
 3. 生物钟画像 - 生成个人时间模式画像
 4. 事件影响追踪 - 分析特定事件对后续状态的影响
+5. AI 驱动的智能洞察 - 结合 AI 分析时间模式
+
+增强功能 v0.2:
+- AI 驱动的模式发现
+- 个性化时间建议
+- 最佳状态条件归因
+- 智能提醒生成
 """
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta, time
 from collections import defaultdict
 import math
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
@@ -28,12 +36,23 @@ TIME_PERIODS = {
     "late_night": (0, 5), # 深夜
 }
 
+# 时间段中文名称
+TIME_PERIOD_NAMES = {
+    "dawn": "黎明",
+    "morning": "上午",
+    "noon": "中午",
+    "afternoon": "下午",
+    "evening": "傍晚",
+    "night": "夜晚",
+    "late_night": "深夜",
+}
+
 # 生物钟类型
 CHRONOTYPE = {
-    "lion": {"name": "狮子型", "peak": (6, 10), "description": "早起者，上午效率最高"},
-    "bear": {"name": "熊型", "peak": (10, 14), "description": "跟随太阳，中午最活跃"},
-    "wolf": {"name": "狼型", "peak": (16, 20), "description": "夜猫子，下午到晚间最佳"},
-    "dolphin": {"name": "海豚型", "peak": (10, 12), "description": "睡眠浅，分散式高效"},
+    "lion": {"name": "狮子型", "peak": (6, 10), "description": "早起者，上午效率最高", "emoji": "🦁"},
+    "bear": {"name": "熊型", "peak": (10, 14), "description": "跟随太阳，中午最活跃", "emoji": "🐻"},
+    "wolf": {"name": "狼型", "peak": (16, 20), "description": "夜猫子，下午到晚间最佳", "emoji": "🐺"},
+    "dolphin": {"name": "海豚型", "peak": (10, 12), "description": "睡眠浅，分散式高效", "emoji": "🐬"},
 }
 
 
@@ -633,6 +652,341 @@ class TimeIntelligence:
                 for mood, count in sorted(mood_counts.items(), key=lambda x: x[1], reverse=True)
             ]
         }
+    
+    # ========== AI 增强功能 ==========
+    
+    async def get_ai_time_insights(self, days: int = 30) -> Dict[str, Any]:
+        """
+        获取 AI 驱动的时间智能洞察
+        
+        综合分析时间模式，生成个性化建议
+        """
+        from app.services.ai_client import get_ai_client, AIClientError
+        
+        # 收集基础数据
+        circadian = self.analyze_circadian_rhythm(days)
+        weekly = self.analyze_weekly_pattern(min(days // 7, 8))
+        
+        # 如果数据不足，返回基础分析
+        if circadian["total_records"] < 10:
+            return {
+                "has_data": False,
+                "message": "数据不足，需要至少10条记录才能进行深度分析",
+                "basic_analysis": circadian
+            }
+        
+        # 准备 AI 分析数据
+        data_summary = {
+            "period_days": days,
+            "total_records": circadian["total_records"],
+            "chronotype": circadian["chronotype"],
+            "peak_hours": circadian["peak_hours"],
+            "valley_hours": circadian["valley_hours"],
+            "best_day": weekly.get("best_day"),
+            "worst_day": weekly.get("worst_day"),
+            "weekend_boost": weekly.get("weekend_boost"),
+            "hourly_activity": {
+                h: stats["count"] 
+                for h, stats in circadian["hourly_stats"].items() 
+                if stats["count"] > 0
+            }
+        }
+        
+        try:
+            ai_client = get_ai_client()
+            
+            prompt = f"""分析以下个人时间模式数据，提供深度洞察和个性化建议。
+
+数据摘要：
+{json.dumps(data_summary, ensure_ascii=False, indent=2)}
+
+请从以下维度分析：
+1. 时间模式特征 - 这个人的作息有什么特点
+2. 效率优化 - 如何利用高峰时段提升效率
+3. 健康建议 - 基于时间模式的健康改进建议
+4. 个性化提醒 - 适合这个人的智能提醒时间
+
+返回JSON格式：
+{{
+    "pattern_summary": "简洁的时间模式总结（1-2句话）",
+    "key_insights": ["洞察1", "洞察2", "洞察3"],
+    "efficiency_tips": ["效率建议1", "效率建议2"],
+    "health_suggestions": ["健康建议1", "健康建议2"],
+    "optimal_schedule": {{
+        "focus_work": "最佳专注时段",
+        "creative_work": "最佳创意时段",
+        "exercise": "最佳运动时段",
+        "rest": "建议休息时段"
+    }},
+    "smart_reminders": [
+        {{"time": "08:00", "message": "提醒内容"}},
+        {{"time": "14:00", "message": "提醒内容"}}
+    ]
+}}"""
+            
+            result = await ai_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": "你是一个专业的时间管理和生物钟分析专家。基于用户的实际数据提供个性化建议。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1500,
+                task_type="time_analysis",
+                task_description="AI 时间智能分析",
+                json_response=True,
+            )
+            
+            ai_insights = result["content"]
+            
+            if isinstance(ai_insights, dict):
+                return {
+                    "has_data": True,
+                    "data_summary": data_summary,
+                    "ai_insights": ai_insights,
+                    "chronotype_info": CHRONOTYPE.get(circadian["chronotype"], CHRONOTYPE["bear"]),
+                    "basic_recommendations": circadian["recommendations"]
+                }
+            else:
+                raise ValueError("AI 返回格式错误")
+                
+        except Exception as e:
+            print(f"AI 时间分析错误: {e}")
+            # 返回基础分析
+            return {
+                "has_data": True,
+                "data_summary": data_summary,
+                "ai_insights": None,
+                "chronotype_info": CHRONOTYPE.get(circadian["chronotype"], CHRONOTYPE["bear"]),
+                "basic_recommendations": circadian["recommendations"],
+                "error": str(e)
+            }
+    
+    async def analyze_best_state_conditions(self, days: int = 60) -> Dict[str, Any]:
+        """
+        分析最佳状态的条件
+        
+        找出高效日的共同特征
+        """
+        start_date = datetime.now() - timedelta(days=days)
+        
+        records = self.db.query(LifeStream).filter(
+            LifeStream.created_at >= start_date
+        ).all()
+        
+        if len(records) < 20:
+            return {
+                "has_data": False,
+                "message": "数据不足，需要更多记录来分析最佳状态条件"
+            }
+        
+        # 按天聚合数据
+        daily_data: Dict[str, Dict] = defaultdict(lambda: {
+            "scores": [],
+            "categories": [],
+            "sleep_recorded": False,
+            "exercise_recorded": False,
+            "social_recorded": False,
+            "early_start": False,  # 是否早起（8点前有记录）
+            "late_activity": False,  # 是否熬夜（23点后有记录）
+        })
+        
+        for record in records:
+            if record.created_at:
+                date_key = record.created_at.strftime("%Y-%m-%d")
+                hour = record.created_at.hour
+                
+                if record.dimension_scores:
+                    avg = sum(record.dimension_scores.values()) / len(record.dimension_scores)
+                    daily_data[date_key]["scores"].append(avg)
+                
+                if record.category:
+                    daily_data[date_key]["categories"].append(record.category)
+                    
+                    if record.category == "SLEEP":
+                        daily_data[date_key]["sleep_recorded"] = True
+                    elif record.category == "ACTIVITY":
+                        daily_data[date_key]["exercise_recorded"] = True
+                    elif record.category == "SOCIAL":
+                        daily_data[date_key]["social_recorded"] = True
+                
+                if hour < 8:
+                    daily_data[date_key]["early_start"] = True
+                if hour >= 23:
+                    daily_data[date_key]["late_activity"] = True
+        
+        # 计算每天的平均分数
+        day_scores = []
+        for date_key, data in daily_data.items():
+            if data["scores"]:
+                avg_score = sum(data["scores"]) / len(data["scores"])
+                day_scores.append({
+                    "date": date_key,
+                    "score": avg_score,
+                    **{k: v for k, v in data.items() if k != "scores" and k != "categories"}
+                })
+        
+        if not day_scores:
+            return {"has_data": False, "message": "无法计算日均分数"}
+        
+        # 按分数排序，分析高分日和低分日
+        day_scores.sort(key=lambda x: x["score"], reverse=True)
+        
+        top_days = day_scores[:max(len(day_scores) // 5, 3)]  # 前20%或至少3天
+        bottom_days = day_scores[-max(len(day_scores) // 5, 3):]  # 后20%
+        
+        # 分析高分日的共同特征
+        top_features = self._analyze_day_features(top_days)
+        bottom_features = self._analyze_day_features(bottom_days)
+        
+        return {
+            "has_data": True,
+            "period_days": days,
+            "sample_size": len(day_scores),
+            "avg_score": round(sum(d["score"] for d in day_scores) / len(day_scores), 1),
+            "high_score_conditions": {
+                "count": len(top_days),
+                "avg_score": round(sum(d["score"] for d in top_days) / len(top_days), 1),
+                "features": top_features,
+            },
+            "low_score_conditions": {
+                "count": len(bottom_days),
+                "avg_score": round(sum(d["score"] for d in bottom_days) / len(bottom_days), 1),
+                "features": bottom_features,
+            },
+            "recommendations": self._generate_state_recommendations(top_features, bottom_features)
+        }
+    
+    def _analyze_day_features(self, days: List[Dict]) -> Dict[str, Any]:
+        """分析一组日期的共同特征"""
+        if not days:
+            return {}
+        
+        features = {
+            "sleep_rate": sum(1 for d in days if d.get("sleep_recorded")) / len(days) * 100,
+            "exercise_rate": sum(1 for d in days if d.get("exercise_recorded")) / len(days) * 100,
+            "social_rate": sum(1 for d in days if d.get("social_recorded")) / len(days) * 100,
+            "early_start_rate": sum(1 for d in days if d.get("early_start")) / len(days) * 100,
+            "late_activity_rate": sum(1 for d in days if d.get("late_activity")) / len(days) * 100,
+        }
+        
+        return {k: round(v, 0) for k, v in features.items()}
+    
+    def _generate_state_recommendations(
+        self, 
+        top_features: Dict[str, Any], 
+        bottom_features: Dict[str, Any]
+    ) -> List[str]:
+        """基于高分/低分日特征生成建议"""
+        recommendations = []
+        
+        # 睡眠记录差异
+        if top_features.get("sleep_rate", 0) > bottom_features.get("sleep_rate", 0) + 20:
+            recommendations.append("规律记录睡眠与高状态日显著相关，建议坚持睡眠追踪")
+        
+        # 运动差异
+        if top_features.get("exercise_rate", 0) > bottom_features.get("exercise_rate", 0) + 20:
+            recommendations.append("运动日通常状态更好，建议增加运动频率")
+        
+        # 社交差异
+        if top_features.get("social_rate", 0) > bottom_features.get("social_rate", 0) + 20:
+            recommendations.append("社交活动与好状态相关，适当增加社交互动")
+        
+        # 早起差异
+        if top_features.get("early_start_rate", 0) > bottom_features.get("early_start_rate", 0) + 20:
+            recommendations.append("早起日状态更佳，尝试保持规律的早起习惯")
+        
+        # 熬夜差异
+        if bottom_features.get("late_activity_rate", 0) > top_features.get("late_activity_rate", 0) + 20:
+            recommendations.append("熬夜与低状态日相关，建议减少深夜活动")
+        
+        if not recommendations:
+            recommendations.append("继续保持良好的作息习惯，数据显示你的时间管理比较稳定")
+        
+        return recommendations
+    
+    def get_time_period_name(self, hour: int) -> str:
+        """获取小时对应的时间段名称"""
+        for period, (start, end) in TIME_PERIODS.items():
+            if start <= hour < end:
+                return TIME_PERIOD_NAMES.get(period, period)
+        return "未知"
+    
+    async def get_smart_reminders(self) -> List[Dict[str, Any]]:
+        """
+        生成智能提醒
+        
+        基于用户的时间模式生成个性化提醒
+        """
+        circadian = self.analyze_circadian_rhythm(30)
+        profile = self.get_bio_clock_profile()
+        
+        reminders = []
+        
+        # 基于生物钟类型的提醒
+        chronotype = circadian.get("chronotype", "bear")
+        
+        if chronotype == "lion":
+            reminders.append({
+                "time": "06:00",
+                "type": "focus",
+                "message": "早晨黄金时间开始，是你最高效的时段！",
+                "icon": "🌅"
+            })
+            reminders.append({
+                "time": "14:00",
+                "type": "rest",
+                "message": "下午精力可能下降，适合处理轻松任务",
+                "icon": "☕"
+            })
+        elif chronotype == "wolf":
+            reminders.append({
+                "time": "10:00",
+                "type": "warmup",
+                "message": "慢慢进入状态，不要强迫自己太早高强度工作",
+                "icon": "🌤️"
+            })
+            reminders.append({
+                "time": "16:00",
+                "type": "focus",
+                "message": "你的创造力高峰即将到来！",
+                "icon": "🚀"
+            })
+        else:  # bear
+            reminders.append({
+                "time": "09:00",
+                "type": "focus",
+                "message": "上午是你的效率时段，安排重要任务",
+                "icon": "💪"
+            })
+            reminders.append({
+                "time": "13:00",
+                "type": "rest",
+                "message": "午休时间，短暂休息可以提升下午效率",
+                "icon": "😴"
+            })
+        
+        # 通用提醒
+        reminders.append({
+            "time": "21:00",
+            "type": "wind_down",
+            "message": "准备放松，减少屏幕使用，为睡眠做准备",
+            "icon": "🌙"
+        })
+        
+        # 基于高峰时段的提醒
+        peak_hours = circadian.get("peak_hours", [])
+        if peak_hours:
+            first_peak = min(peak_hours)
+            reminders.append({
+                "time": f"{first_peak:02d}:00",
+                "type": "peak",
+                "message": f"数据显示 {first_peak}:00 是你的活跃高峰，把握这个时段",
+                "icon": "⚡"
+            })
+        
+        # 按时间排序
+        reminders.sort(key=lambda x: x["time"])
+        
+        return reminders
 
 
 # 全局单例

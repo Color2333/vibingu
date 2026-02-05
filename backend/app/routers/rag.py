@@ -1,8 +1,14 @@
-"""RAG API - 个人知识库"""
+"""RAG API - 个人知识库
+
+增强版 v0.2:
+- 对话式问答（支持历史）
+- 主题摘要生成
+- 生活洞察报告
+"""
 
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 from app.services.rag import get_rag_service
@@ -14,6 +20,13 @@ class AskRequest(BaseModel):
     """问答请求"""
     question: str
     n_context: int = 5
+
+
+class ChatRequest(BaseModel):
+    """对话式问答请求"""
+    question: str
+    history: Optional[List[Dict[str, str]]] = None
+    n_context: int = 7
 
 
 class SearchRequest(BaseModel):
@@ -177,3 +190,53 @@ async def clear_index():
         "status": "cleared",
         **result
     }
+
+
+# ========== 增强功能 v0.2 ==========
+
+@router.post("/chat")
+async def chat(request: ChatRequest):
+    """
+    对话式问答（支持历史）
+    
+    基于个人生活数据进行多轮对话
+    """
+    rag = get_rag_service()
+    result = rag.ask_with_context(
+        question=request.question,
+        conversation_history=request.history,
+        n_context=request.n_context
+    )
+    
+    return result
+
+
+@router.get("/topic-summary")
+async def get_topic_summary(
+    topic: str = Query(..., description="主题关键词，如: 睡眠、运动、心情"),
+    days: int = Query(30, ge=7, le=90, description="分析天数")
+):
+    """
+    生成特定主题的摘要分析
+    
+    对某个维度或主题进行深入分析
+    """
+    rag = get_rag_service()
+    result = rag.generate_topic_summary(topic=topic, days=days)
+    
+    return result
+
+
+@router.get("/life-insights")
+async def get_life_insights(
+    days: int = Query(30, ge=7, le=90, description="分析天数")
+):
+    """
+    生成生活洞察报告
+    
+    综合分析最近一段时间的生活数据，生成整体洞察
+    """
+    rag = get_rag_service()
+    result = rag.get_life_insights(period_days=days)
+    
+    return result

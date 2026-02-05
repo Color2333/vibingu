@@ -10,6 +10,7 @@ import WeeklyPattern from '@/components/WeeklyPattern';
 import BioClockProfile from '@/components/BioClockProfile';
 import AIWeeklyAnalysis from '@/components/AIWeeklyAnalysis';
 import AITrends from '@/components/AITrends';
+import AITimeInsights from '@/components/AITimeInsights';
 
 interface AnalyticsPageProps {
   refreshKey: number;
@@ -57,23 +58,29 @@ export default function AnalyticsPage({ refreshKey }: AnalyticsPageProps) {
       {/* 时间智能分析 */}
       <div className="pt-4 border-t border-white/[0.06]">
         <h2 className="text-lg font-semibold text-white/80 mb-4">时间节律分析</h2>
+        
+        {/* AI 时间洞察 - 新增 */}
+        <section className="animate-fade-in delay-5 mb-6">
+          <AITimeInsights key={`ai-time-${refreshKey}`} />
+        </section>
+        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="animate-fade-in delay-5">
+          <section className="animate-fade-in delay-6">
             <CircadianChart key={`circadian-${refreshKey}`} />
           </section>
-          <section className="animate-fade-in delay-5">
+          <section className="animate-fade-in delay-6">
             <WeeklyPattern key={`weekly-${refreshKey}`} />
           </section>
         </div>
       </div>
 
       {/* 年度热力图 */}
-      <section className="animate-fade-in delay-6">
+      <section className="animate-fade-in delay-7">
         <YearHeatmap key={`heatmap-${refreshKey}`} />
       </section>
 
       {/* 生物钟档案 */}
-      <section className="animate-fade-in delay-7">
+      <section className="animate-fade-in delay-8">
         <BioClockProfile key={`bioclock-${refreshKey}`} />
       </section>
     </div>

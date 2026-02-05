@@ -83,3 +83,27 @@ async def get_health_alerts():
     """
     predictor = get_predictor()
     return predictor.get_health_alerts()
+
+
+# ========== AI 增强功能 v0.2 ==========
+
+@router.get("/ai-tomorrow")
+async def ai_predict_tomorrow():
+    """
+    AI 驱动的次日预测
+    
+    结合历史数据和 AI 分析，给出更精准的预测
+    """
+    predictor = get_predictor()
+    return await predictor.ai_predict_tomorrow()
+
+
+@router.get("/ai-risks")
+async def ai_detect_risks():
+    """
+    AI 驱动的风险检测
+    
+    分析近期数据，识别潜在的健康风险
+    """
+    predictor = get_predictor()
+    return await predictor.ai_detect_risks()

@@ -1,4 +1,10 @@
-"""时间智能分析 API"""
+"""时间智能分析 API
+
+增强版 v0.2:
+- AI 驱动的时间洞察
+- 最佳状态条件分析
+- 智能提醒生成
+"""
 
 from fastapi import APIRouter, Query
 from typing import Optional
@@ -106,3 +112,40 @@ async def get_mood_distribution(
     """
     ti = get_time_intelligence()
     return ti.get_mood_distribution(days)
+
+
+@router.get("/ai-insights")
+async def get_ai_time_insights(
+    days: int = Query(30, ge=7, le=90, description="分析天数")
+):
+    """
+    获取 AI 驱动的时间智能洞察
+    
+    综合分析时间模式，生成个性化建议
+    """
+    ti = get_time_intelligence()
+    return await ti.get_ai_time_insights(days)
+
+
+@router.get("/best-conditions")
+async def get_best_state_conditions(
+    days: int = Query(60, ge=30, le=180, description="分析天数")
+):
+    """
+    分析最佳状态的条件
+    
+    找出高效日的共同特征
+    """
+    ti = get_time_intelligence()
+    return await ti.analyze_best_state_conditions(days)
+
+
+@router.get("/smart-reminders")
+async def get_smart_reminders():
+    """
+    获取智能提醒
+    
+    基于用户的时间模式生成个性化提醒
+    """
+    ti = get_time_intelligence()
+    return await ti.get_smart_reminders()
