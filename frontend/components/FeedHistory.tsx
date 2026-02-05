@@ -383,7 +383,7 @@ const TimelineCard = memo(function TimelineCard({
 }, (prevProps, nextProps) => {
   const p = prevProps.item;
   const n = nextProps.item;
-  return p.id === n.id && p._pending === n._pending && p.ai_insight === n.ai_insight;
+  return p.id === n.id && p._pending === n._pending && p.ai_insight === n.ai_insight && p.is_public === n.is_public;
 });
 
 // ========== 主组件 ==========

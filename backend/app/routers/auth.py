@@ -2,8 +2,9 @@
 简单密码认证 API
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
+from typing import Optional
 import os
 import hashlib
 import secrets
@@ -12,6 +13,26 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # 简单的 token 存储（生产环境应该用 Redis）
 valid_tokens: set = set()
+
+
+def verify_token(authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    验证 Bearer token 的依赖函数
+    用于保护需要认证的端点
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="未提供认证信息")
+    
+    # 支持 "Bearer <token>" 格式
+    if authorization.startswith("Bearer "):
+        token = authorization[7:]
+    else:
+        token = authorization
+    
+    if token not in valid_tokens:
+        raise HTTPException(status_code=401, detail="无效的认证信息")
+    
+    return token
 
 class LoginRequest(BaseModel):
     password: str

@@ -171,23 +171,34 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
   // 删除记录
   const handleDelete = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/feed/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('vibingu_token');
+      const res = await fetch(`/api/feed/${id}`, { 
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         feedDataRef.current.delete(id);
         setFeedIds(prev => prev.filter(i => i !== id));
         showToast('success', '记录已删除');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        showToast('error', errorData.detail || '删除失败');
       }
     } catch {
-      showToast('error', '删除失败');
+      showToast('error', '网络错误，请重试');
     }
   }, [showToast]);
 
   // 切换公开状态
   const handleTogglePublic = useCallback(async (id: string, isPublic: boolean) => {
     try {
+      const token = localStorage.getItem('vibingu_token');
       const res = await fetch(`/api/feed/${id}/visibility`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ is_public: isPublic }),
       });
       if (res.ok) {
@@ -197,9 +208,13 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
           setFeedIds(prev => [...prev]); // 触发重渲染
         }
         showToast('success', isPublic ? '已设为公开' : '已设为私密');
+      } else {
+        // 处理 HTTP 错误状态
+        const errorData = await res.json().catch(() => ({}));
+        showToast('error', errorData.detail || '操作失败');
       }
     } catch {
-      showToast('error', '操作失败');
+      showToast('error', '网络错误，请重试');
     }
   }, [showToast]);
 

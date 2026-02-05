@@ -20,6 +20,7 @@ from app.services.tagger import get_tagger
 from app.services.dimension_analyzer import get_dimension_analyzer
 from app.services.gamification import get_gamification_service
 from app.schemas.feed import FeedResponse
+from app.routers.auth import verify_token
 
 # 延迟加载 RAG 服务（避免启动时的循环导入）
 _rag_service = None
@@ -494,9 +495,10 @@ async def chat_with_record(
 async def delete_record(
     record_id: str,
     db: Session = Depends(get_db),
+    _: str = Depends(verify_token),
 ):
     """
-    删除记录（软删除）
+    删除记录（软删除）- 需要认证
     
     - **record_id**: 记录 ID
     """
@@ -521,9 +523,10 @@ async def update_visibility(
     record_id: str,
     update: VisibilityUpdate,
     db: Session = Depends(get_db),
+    _: str = Depends(verify_token),
 ):
     """
-    更新记录可见性
+    更新记录可见性 - 需要认证
     
     - **record_id**: 记录 ID
     - **is_public**: 是否公开
