@@ -4,7 +4,7 @@
 
 个人生活数据黑匣子 —— 建立你的生活数据集，用 AI 寻找「最佳状态」的源代码。
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://img.shields.io/badge/tests-70%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
@@ -26,7 +26,31 @@
 
 ## Features
 
-### v0.2 新功能
+### v0.3 新功能 ✨
+
+#### 主题系统
+- **浅色/深色主题** - 支持手动切换或跟随系统偏好
+- **CSS 变量架构** - 全局主题变量，组件自动适配
+- **平滑过渡** - 主题切换时的优雅动画效果
+
+#### 数据管理
+- **隐私控制** - 记录默认私密，可选择公开分享
+- **软删除** - 安全删除不需要的记录
+- **公开首页** - 展示公开记录的社区页面
+- **密码入口** - 私密空间的安全访问
+
+#### 智能时间系统
+- **记录时间推断** - AI 自动识别事件实际发生时间
+- **睡眠截图分析** - 从截图中提取入睡/苏醒时间
+- **时间筛选器** - 按今天/昨天/本周/本月或自定义日期范围筛选
+
+#### AI 体验优化
+- **手动触发模式** - AI 分析不再自动运行，用户按需生成
+- **本地缓存** - 分析结果本地存储，减少重复请求
+- **重试机制** - 失败时可重新生成，支持错误恢复
+- **AI 对话助手** - 悬浮按钮快速访问 AI 问答
+
+### v0.2 功能
 
 #### AI Agent 系统
 - **统一 AI 客户端** - 自动重试、模型降级、Token 追踪
@@ -77,7 +101,7 @@
 | Vector Store | ChromaDB (RAG 检索) |
 | AI | 智谱 GLM-4 / OpenAI GPT-4o (可切换) |
 | Testing | pytest, pytest-asyncio |
-| Design | Glassmorphism, Dark Theme |
+| Design | Glassmorphism, Light/Dark Theme |
 
 ## Architecture
 
@@ -170,8 +194,22 @@ pytest tests/ -v
 vibingu/
 ├── frontend/                 # Next.js 前端
 │   ├── app/                  # 页面路由
+│   │   ├── page.tsx          # 主页（公开/私密入口）
+│   │   ├── record/[id]/      # 记录详情页
+│   │   └── globals.css       # 主题变量 & 全局样式
 │   ├── components/           # React 组件
+│   │   ├── pages/            # 页面级组件
+│   │   │   ├── RecordPage.tsx
+│   │   │   ├── PublicFeedPage.tsx
+│   │   │   └── ...
+│   │   ├── FeedHistory.tsx   # 时间轴列表
+│   │   ├── MagicInputBar.tsx # 多模态输入框
+│   │   ├── ChatAssistant.tsx # AI 对话助手
+│   │   ├── ThemeToggle.tsx   # 主题切换器
+│   │   └── ...
 │   ├── hooks/                # 自定义 Hooks
+│   │   ├── useAuth.tsx       # 认证状态
+│   │   └── useTheme.tsx      # 主题管理
 │   └── public/               # 静态资源 & PWA
 ├── backend/                  # FastAPI 后端
 │   ├── app/
@@ -179,6 +217,7 @@ vibingu/
 │   │   ├── routers/          # API 路由
 │   │   ├── services/         # 业务逻辑
 │   │   │   ├── ai_client.py      # 统一 AI 客户端
+│   │   │   ├── data_extractor.py # 数据提取 & 时间推断
 │   │   │   ├── tagger.py         # 智能标签 Agent
 │   │   │   ├── time_intelligence.py  # 时间智能分析
 │   │   │   ├── predictor.py      # 预测引擎
@@ -186,14 +225,8 @@ vibingu/
 │   │   │   └── token_tracker.py  # Token 用量追踪
 │   │   └── schemas/          # Pydantic 模型
 │   ├── tests/                # 单元测试 (70+ tests)
-│   │   ├── conftest.py       # 测试配置
-│   │   ├── test_ai_client.py
-│   │   ├── test_tagger.py
-│   │   ├── test_time_intelligence.py
-│   │   ├── test_predictor.py
-│   │   └── test_rag.py
 │   └── requirements.txt
-└── 下一部进展.md              # 产品规划文档
+└── README.md                 # 项目文档
 ```
 
 ## API Overview
@@ -204,6 +237,10 @@ vibingu/
 |----------|--------|-------------|
 | `/api/feed` | POST | 多模态数据输入 |
 | `/api/feed/history` | GET | 获取记录历史 |
+| `/api/feed/{id}` | GET | 获取记录详情 |
+| `/api/feed/{id}` | DELETE | 删除记录（软删除） |
+| `/api/feed/{id}/visibility` | PUT | 切换公开/私密 |
+| `/api/feed/public` | GET | 获取公开记录 |
 | `/api/analytics/vibe/today` | GET | 今日 Vibe 评分 |
 | `/api/analytics/trend` | GET | Vibe 趋势数据 |
 
@@ -211,10 +248,14 @@ vibingu/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/api/ai/weekly-analysis` | GET | AI 周度分析 |
+| `/api/ai/suggestions` | GET | AI 智能建议 |
 | `/api/ai/tags/generate` | POST | AI 生成标签 |
 | `/api/ai/time/insights` | GET | 时间智能分析 |
 | `/api/ai/predict/tomorrow` | GET | 次日状态预测 |
 | `/api/ai/rag/ask` | POST | RAG 智能问答 |
+| `/api/chat/message` | POST | AI 对话消息 |
+| `/api/feed/{id}/chat` | POST | 记录专属对话 |
 
 ### 报告 API
 
@@ -224,7 +265,25 @@ vibingu/
 | `/api/reports/milestones` | GET | 里程碑数据 |
 | `/api/reports/export` | GET | 数据导出 |
 
+### Token 用量 API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tokens/summary` | GET | 用量汇总 |
+| `/api/tokens/trend` | GET | 用量趋势 |
+| `/api/tokens/by-model` | GET | 按模型分类 |
+
 ## Roadmap
+
+### Completed (v0.3)
+- [x] 浅色/深色主题系统
+- [x] 数据隐私控制（公开/私密）
+- [x] 软删除功能
+- [x] 公开首页与密码入口
+- [x] 智能时间推断（record_time）
+- [x] AI 手动触发 & 本地缓存
+- [x] 首页时间筛选器
+- [x] AI 对话悬浮助手
 
 ### Completed (v0.2)
 - [x] 统一 AI 客户端（重试、降级、追踪）
@@ -233,21 +292,20 @@ vibingu/
 - [x] RAG 问答系统
 - [x] 预测 & 异常检测
 - [x] 单元测试覆盖 (70+ tests)
-
-### In Progress
-- [ ] 高级可视化组件
-  - [ ] 年度热力图
-  - [ ] 多维雷达图
-  - [ ] 时间分布环形图
-- [ ] 游戏化系统
-  - [ ] 等级 & 经验值
-  - [ ] 成就徽章
+- [x] 高级可视化组件
+  - [x] 年度热力图
+  - [x] 多维雷达图
+  - [x] 时间分布环形图
+- [x] 游戏化系统
+  - [x] 等级 & 经验值
+  - [x] 成就徽章
 
 ### Planned
 - [ ] 云图床接入 (Cloudflare R2)
 - [ ] Docker 部署
 - [ ] CI/CD 流水线
 - [ ] 多设备数据同步
+- [ ] 性能优化
 
 ## Environment Variables
 
@@ -277,4 +335,6 @@ MIT License - feel free to use and modify.
 
 ---
 
-*Built with love for a better life. 你的生活，值得被深度理解。*
+*Built with ❤️ for a better life. 你的生活，值得被深度理解。*
+
+**v0.3.0** | 2025
