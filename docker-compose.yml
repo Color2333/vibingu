@@ -19,7 +19,7 @@ services:
       - backend_uploads:/app/uploads
       - chroma_data:/app/chroma_db
     ports:
-      - "8000:8000"
+      - "8001:8000"
     networks:
       - vibingu-network
     healthcheck:
@@ -41,7 +41,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://backend:8000
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       backend:
         condition: service_healthy
