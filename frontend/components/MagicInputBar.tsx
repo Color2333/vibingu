@@ -55,14 +55,17 @@ interface FeedResponse {
   meta_data: Record<string, unknown> | null;
   ai_insight: string;
   created_at: string;
+  tags?: string[];
 }
 
 interface MagicInputBarProps {
   onSuccess: (response: FeedResponse) => void;
   onLoading: (loading: boolean) => void;
+  onOptimisticAdd?: (data: { text: string; imagePreview: string | null }) => void;
+  onError?: () => void;
 }
 
-export default function MagicInputBar({ onSuccess, onLoading }: MagicInputBarProps) {
+export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError }: MagicInputBarProps) {
   const [text, setText] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -129,8 +132,8 @@ export default function MagicInputBar({ onSuccess, onLoading }: MagicInputBarPro
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
-    recognition.continuous = false;  // 单次识别，避免重复
-    recognition.interimResults = false;  // 只返回最终结果
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const result = event.results[0];
@@ -151,27 +154,49 @@ export default function MagicInputBar({ onSuccess, onLoading }: MagicInputBarPro
   const handleSubmit = async () => {
     if (!text.trim() && !image) return;
 
+    const currentText = text.trim();
+    const currentImagePreview = imagePreview;
+
+    // 立即清空输入
+    setText('');
+    clearImage();
+
+    // 乐观更新 - 立即显示记录
+    if (onOptimisticAdd) {
+      onOptimisticAdd({
+        text: currentText,
+        imagePreview: currentImagePreview,
+      });
+    }
+
     setIsSubmitting(true);
     onLoading(true);
 
     try {
       const formData = new FormData();
-      if (text.trim()) formData.append('text', text.trim());
+      if (currentText) formData.append('text', currentText);
       if (image) formData.append('image', image);
+      
+      // 传递客户端实时时间
+      const clientTime = new Date().toISOString();
+      formData.append('client_time', clientTime);
 
       const response = await fetch('/api/feed', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) throw new Error('提交失败');
+      if (!response.ok) {
+        throw new Error('提交失败');
+      }
 
       const data = await response.json();
       onSuccess(data);
-      setText('');
-      clearImage();
     } catch (err) {
       console.error(err);
+      if (onError) {
+        onError();
+      }
     } finally {
       setIsSubmitting(false);
       onLoading(false);

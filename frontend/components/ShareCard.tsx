@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Share2, Download, X, Star, Flame } from 'lucide-react';
 
-interface ShareCardProps {
+interface VibeData {
   vibeScore: number | null;
   sleepScore: number | null;
   dietScore: number | null;
   screenScore: number | null;
   activityScore: number | null;
-  streak?: number;
+  streak: number;
 }
 
 interface LevelData {
@@ -28,26 +28,51 @@ interface DimensionData {
   leisure: number | null;
 }
 
-export default function ShareCard({ 
-  vibeScore, 
-  sleepScore, 
-  dietScore, 
-  screenScore, 
-  activityScore,
-  streak = 0
-}: ShareCardProps) {
+export default function ShareCard() {
   const [showModal, setShowModal] = useState(false);
+  const [vibeData, setVibeData] = useState<VibeData>({
+    vibeScore: null,
+    sleepScore: null,
+    dietScore: null,
+    screenScore: null,
+    activityScore: null,
+    streak: 0
+  });
   const [levelData, setLevelData] = useState<LevelData | null>(null);
   const [dimensions, setDimensions] = useState<DimensionData | null>(null);
   const [cardStyle, setCardStyle] = useState<'classic' | 'radar' | 'minimal'>('classic');
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // 获取今日 Vibe 数据
+  const fetchVibeData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/analytics/vibe/today');
+      if (res.ok) {
+        const data = await res.json();
+        setVibeData({
+          vibeScore: data.vibe_index,
+          sleepScore: data.sleep_score,
+          dietScore: data.diet_score,
+          screenScore: data.screen_score,
+          activityScore: data.activity_score,
+          streak: data.streak || 0
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch vibe data:', e);
+    }
+  }, []);
+
   useEffect(() => {
     if (showModal) {
+      fetchVibeData();
       fetchLevelData();
       fetchDimensions();
     }
-  }, [showModal]);
+  }, [showModal, fetchVibeData]);
+
+  // 解构 vibeData 用于渲染
+  const { vibeScore, sleepScore, dietScore, screenScore, activityScore, streak } = vibeData;
 
   const fetchLevelData = async () => {
     try {

@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import { ToastProvider } from '@/components/Toast';
 import { AuthProvider } from '@/hooks/useAuth';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Vibing u - Digitize Your Vibe',
@@ -41,7 +38,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         <AuthProvider>
           <ToastProvider>
             <ServiceWorkerRegistration />

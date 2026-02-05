@@ -9,11 +9,14 @@ settings = get_settings()
 
 
 class AIParser:
-    """AI 解析服务 - 使用 GPT-4o Vision 解析多模态输入"""
+    """AI 解析服务 - 根据输入类型选择模型"""
     
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
-        self.model = "gpt-4o"  # 默认模型
+        api_key = settings.get_ai_api_key()
+        base_url = settings.get_ai_base_url()
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
+        self.vision_model = settings.vision_model   # 有图像时用视觉模型
+        self.text_model = settings.text_model       # 纯文本用便宜模型
     
     async def parse(
         self,
@@ -55,35 +58,38 @@ class AIParser:
         
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
         
-        system_prompt = """你是 Vibing u 的首席分析师。你冷静、客观，但极具洞察力。
+        # 根据是否有图像调整 prompt
+        has_image = image_base64 is not None
+        
+        system_prompt = f"""你是 Vibing u 的首席分析师。你冷静、客观，但极具洞察力。
 你的目标是通过数据帮助用户达到 "High Vibe" 状态。
 
+【重要】本次输入{"包含图片" if has_image else "仅有文字，没有图片"}。请严格基于实际输入内容分析，不要臆测不存在的内容。
+
 你的任务是：
-1. 从用户上传的信息（照片/文本）中提取结构化数据
+1. 从用户的{"图片和文字" if has_image else "文字描述"}中提取结构化数据
 2. 判断输入属于哪个分类
-3. 用简短、犀利的语言给出建议
+3. 用简短、温暖的语言给出回复（不要重复用户说的话）
 4. 为内容生成相关的标签 (tags)
 
 分类枚举：SLEEP（睡眠）, DIET（饮食）, SCREEN（屏幕时间）, ACTIVITY（活动）, MOOD（情绪）, GROWTH（成长/学习）, SOCIAL（社交）, LEISURE（休闲）
 
 请以 JSON 格式输出，包含以下字段：
 - category: 分类（上述枚举之一）
-- meta_data: 提取的详细数据（根据类型不同）
-- reply_text: 给用户的一句话回复（中文，简短犀利）
-- tags: 相关标签数组，格式为 "#类别/标签名"，如 ["#饮食/咖啡", "#时间/早晨"]
+- meta_data: 提取的结构化数据，只包含有意义的字段，比如：
+  * MOOD: {{"mood": "happy/sad/neutral", "note": "简短描述"}}
+  * DIET: {{"food_name": "食物名", "calories": 数值}}
+  * SLEEP: {{"duration_hours": 数值, "quality": "good/fair/poor"}}
+- reply_text: 给用户的一句话回复（中文，温暖有洞察力，不要说"分享"、"照片"等词汇除非确实有图片）
+- tags: 相关标签数组，格式为 "#类别/标签名"
 
-示例输出格式：
-{
-    "category": "DIET",
-    "meta_data": {
-        "food_name": "冰美式",
-        "caffeine_mg": 150,
-        "calories": 5,
-        "is_healthy": true
-    },
-    "reply_text": "记下了。150mg 咖啡因，下午喝要注意别影响晚上睡眠哦。",
-    "tags": ["#饮食/咖啡", "#时间/下午", "#习惯/提神"]
-}"""
+示例（纯文字输入"今天心情不错"）：
+{{
+    "category": "MOOD",
+    "meta_data": {{"mood": "happy"}},
+    "reply_text": "好心情是一天的好开始，继续保持！",
+    "tags": ["#心情/开心", "#时间/上午"]
+}}"""
 
         messages = [
             {"role": "system", "content": system_prompt}
@@ -111,8 +117,11 @@ class AIParser:
         
         messages.append({"role": "user", "content": user_content})
         
+        # 根据是否有图像选择模型
+        model = self.vision_model if image_base64 else self.text_model
+        
         response = await self.client.chat.completions.create(
-            model=self.model,
+            model=model,
             messages=messages,
             max_tokens=1000,
             response_format={"type": "json_object"},
@@ -122,7 +131,7 @@ class AIParser:
         if response.usage:
             try:
                 record_usage(
-                    model=self.model,
+                    model=model,
                     prompt_tokens=response.usage.prompt_tokens,
                     completion_tokens=response.usage.completion_tokens,
                     task_type="parse_input",

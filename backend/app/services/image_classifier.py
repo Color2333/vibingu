@@ -17,6 +17,7 @@ class ImageClassifier:
     # 图片类型定义
     IMAGE_TYPES = {
         "screenshot": {"save": False, "desc": "屏幕截图"},
+        "sleep_screenshot": {"save": False, "desc": "睡眠数据截图"},
         "food": {"save": True, "desc": "美食照片"},
         "activity_screenshot": {"save": False, "desc": "运动数据截图"},
         "activity_photo": {"save": True, "desc": "户外运动照片"},
@@ -26,7 +27,10 @@ class ImageClassifier:
     }
     
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        api_key = settings.get_ai_api_key()
+        base_url = settings.get_ai_base_url()
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
+        self.vision_model = settings.simple_vision_model  # 图片分类是简单任务，用免费模型
     
     async def classify(self, image_base64: str, text_hint: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -61,7 +65,8 @@ class ImageClassifier:
         system_prompt = """你是一个图片分类专家。请分析用户上传的图片，判断：
 
 1. **图片类型** (image_type)：
-   - screenshot: 手机/电脑屏幕截图（如屏幕时间、App 使用统计、聊天记录截图等）
+   - screenshot: 一般屏幕截图（如屏幕时间、App 使用统计等）
+   - sleep_screenshot: 睡眠数据截图（如 iPhone 健康 App 睡眠记录、Sleep Cycle 等睡眠 App 截图）
    - food: 美食照片（实拍的食物、餐厅、饮品等）
    - activity_screenshot: 运动数据截图（如跑步 App 截图、健身记录截图）
    - activity_photo: 户外运动实拍照片（如跑步途中风景、健身房自拍）
@@ -70,14 +75,14 @@ class ImageClassifier:
    - other: 其他类型
 
 2. **是否值得保存原图** (should_save_image)：
-   - 截图类（screenshot, activity_screenshot）→ false（数据提取后不需要原图）
+   - 截图类（screenshot, sleep_screenshot, activity_screenshot）→ false（数据提取后不需要原图）
    - 实拍照片（food, activity_photo, scenery, selfie）→ true（有纪念价值）
    - 其他 → false
 
 3. **内容描述** (content_hint)：简要描述图片内容
 
 4. **推荐分类** (category_suggestion)：
-   - SLEEP: 睡眠相关
+   - SLEEP: 睡眠相关（包括睡眠截图、睡眠记录等）
    - DIET: 饮食相关
    - SCREEN: 屏幕时间相关
    - ACTIVITY: 运动活动相关
@@ -85,7 +90,7 @@ class ImageClassifier:
 
 请以 JSON 格式输出：
 {
-    "image_type": "screenshot|food|activity_screenshot|activity_photo|scenery|selfie|other",
+    "image_type": "screenshot|sleep_screenshot|food|activity_screenshot|activity_photo|scenery|selfie|other",
     "should_save_image": true|false,
     "save_reason": "原因说明（如果保存）",
     "content_hint": "图片内容简述",
@@ -109,7 +114,7 @@ class ImageClassifier:
         })
         
         response = await self.client.chat.completions.create(
-            model="gpt-4o",
+            model=self.vision_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
@@ -140,7 +145,11 @@ class ImageClassifier:
         
         if text_hint:
             hint_lower = text_hint.lower()
-            if any(w in hint_lower for w in ["屏幕", "screen", "使用时间", "app"]):
+            if any(w in hint_lower for w in ["睡眠", "sleep", "睡觉", "起床", "入睡", "wake"]):
+                image_type = "sleep_screenshot"
+                category = "SLEEP"
+                should_save = False
+            elif any(w in hint_lower for w in ["屏幕", "screen", "使用时间", "app"]):
                 image_type = "screenshot"
                 category = "SCREEN"
                 should_save = False
@@ -152,8 +161,6 @@ class ImageClassifier:
                 image_type = "activity_screenshot"
                 category = "ACTIVITY"
                 should_save = False
-            elif any(w in hint_lower for w in ["睡", "sleep", "起床"]):
-                category = "SLEEP"
         
         return {
             "image_type": image_type,

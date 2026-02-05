@@ -41,9 +41,12 @@ class RAGService:
             metadata={"description": "Personal life records for RAG"}
         )
         
-        # OpenAI 客户端
-        self.openai_client = OpenAI(api_key=settings.openai_api_key)
-        self.embedding_model = "text-embedding-3-small"
+        # AI 客户端 (支持 OpenAI 或 智谱AI)
+        api_key = settings.get_ai_api_key()
+        base_url = settings.get_ai_base_url()
+        self.openai_client = OpenAI(api_key=api_key, base_url=base_url)
+        self.embedding_model = settings.embedding_model
+        self.smart_model = settings.smart_model  # 用于问答的高级模型
         
         # 数据库
         self.db: Session = SessionLocal()
@@ -345,7 +348,7 @@ class RAGService:
 请基于以上记录回答用户的问题。"""
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model=self.smart_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}

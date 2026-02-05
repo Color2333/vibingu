@@ -73,13 +73,7 @@ export default function VibingCard() {
         <p className="text-xs uppercase tracking-[0.2em] text-white/40">
           Today&apos;s Vibe
         </p>
-        <ShareCard
-          vibeScore={vibeScore}
-          sleepScore={vibeData?.sleep_score ?? null}
-          dietScore={vibeData?.diet_score ?? null}
-          screenScore={vibeData?.screen_score ?? null}
-          activityScore={vibeData?.activity_score ?? null}
-        />
+<ShareCard />
       </div>
       
       {/* Main Score */}

@@ -14,8 +14,10 @@ class TaggerAgent:
     """智能标签生成器"""
     
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
-        self.model = "gpt-4o-mini"  # 使用更便宜的模型
+        api_key = settings.get_ai_api_key()
+        base_url = settings.get_ai_base_url()
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
+        self.model = settings.simple_text_model  # 标签生成是简单任务，用免费模型
         
         # 标签层级结构
         self.tag_hierarchy = {

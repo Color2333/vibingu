@@ -48,6 +48,7 @@ async def create_feed(
     text: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     category_hint: Optional[str] = Form(None),
+    client_time: Optional[str] = Form(None),  # 客户端实时时间
     db: Session = Depends(get_db),
 ):
     """
@@ -89,7 +90,7 @@ async def create_feed(
         should_save_image = classification_result["should_save_image"]
         
         # 设置输入类型
-        if image_type in ["screenshot", "activity_screenshot"]:
+        if image_type in ["screenshot", "activity_screenshot", "sleep_screenshot"]:
             input_type = InputType.SCREENSHOT.value
         else:
             input_type = InputType.IMAGE.value
@@ -101,12 +102,14 @@ async def create_feed(
             image_base64=image_base64,
             text=text,
             content_hint=classification_result.get("content_hint") if classification_result else None,
+            client_time=client_time,  # 传递客户端时间
         )
     else:
         # 纯文本输入
         extract_result = await data_extractor.extract(
             image_type="other",
             text=text,
+            client_time=client_time,  # 传递客户端时间
         )
     
     # ===== Phase 3: 存储决策 =====

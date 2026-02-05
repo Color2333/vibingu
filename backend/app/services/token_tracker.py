@@ -31,16 +31,18 @@ class TokenTracker:
         total_tokens = prompt_tokens + completion_tokens
         cost = calculate_cost(model, prompt_tokens, completion_tokens)
         
-        # 确定模型类型
+        # 确定模型类型 (支持 OpenAI 和 智谱AI)
         model_type = "other"
-        if "gpt-4o-mini" in model:
-            model_type = "gpt-4o-mini"
+        if "glm-4.6v" in model or "gpt-4o-mini" in model:
+            model_type = "vision"     # 视觉模型
+        elif "glm-4.7" in model and "flash" not in model:
+            model_type = "smart"      # 高级文本模型 (付费)
+        elif "glm-4.7-flash" in model or "gpt-3.5" in model:
+            model_type = "text"       # 普通文本模型 (免费)
         elif "gpt-4o" in model:
-            model_type = "gpt-4o"
-        elif "gpt-3.5" in model:
-            model_type = "gpt-3.5-turbo"
+            model_type = "smart"      # OpenAI 高级模型
         elif "embedding" in model:
-            model_type = "text-embedding"
+            model_type = "embedding"  # 嵌入模型
         
         usage = TokenUsage(
             model=model,

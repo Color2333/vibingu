@@ -14,11 +14,44 @@ class Settings(BaseSettings):
     postgres_user: str = "vibingu"
     postgres_password: str = "vibingu_secret"
     postgres_db: str = "vibingu"
-    postgres_host: str = "localhost"
+    postgres_host: str = ""  # 留空则使用 SQLite
     postgres_port: int = 5432
     
-    # OpenAI
+    # AI Provider 配置
+    # 支持 OpenAI 或 智谱AI (ZhipuAI)
+    ai_provider: str = "zhipu"  # "openai" 或 "zhipu"
+    
+    # OpenAI 配置
     openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    
+    # 智谱AI 配置
+    zhipu_api_key: str = ""
+    zhipu_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    
+    # 模型配置 (默认使用智谱AI模型)
+    # 智谱AI 可用模型:
+    #   视觉: glm-4.6v (付费) / glm-4.6v-flash (免费)
+    #   文本: glm-4.7 (付费) / glm-4.7-flash (免费)
+    #   嵌入: embedding-3
+    vision_model: str = "glm-4.6v"              # 图像解析 (付费，高质量)
+    text_model: str = "glm-4.7"                 # 文本解析 (付费，高质量)
+    smart_model: str = "glm-4.7"                # 决策助手 (付费，高质量)
+    simple_vision_model: str = "glm-4.6v-flash" # 简单视觉任务 (免费)
+    simple_text_model: str = "glm-4.7-flash"    # 简单文本任务 (免费)
+    embedding_model: str = "embedding-3"        # 嵌入模型
+    
+    def get_ai_api_key(self) -> str:
+        """获取当前 AI 提供商的 API Key"""
+        if self.ai_provider == "zhipu":
+            return self.zhipu_api_key
+        return self.openai_api_key
+    
+    def get_ai_base_url(self) -> str:
+        """获取当前 AI 提供商的 Base URL"""
+        if self.ai_provider == "zhipu":
+            return self.zhipu_base_url
+        return self.openai_base_url
     
     # Server
     debug: bool = True
@@ -66,7 +99,7 @@ class Settings(BaseSettings):
         return f"sqlite:///{db_path}"
     
     class Config:
-        env_file = "../.env"  # 指向项目根目录的 .env
+        env_file = ".env"  # 当前目录或 backend 目录的 .env
         env_file_encoding = "utf-8"
         extra = "ignore"  # 忽略 .env 中的额外字段
 
