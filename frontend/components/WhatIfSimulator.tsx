@@ -54,7 +54,7 @@ export default function WhatIfSimulator({ className = '' }: Props) {
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center gap-2 mb-6">
         <Beaker className="w-5 h-5 text-cyan-400" />
-        <h3 className="text-lg font-semibold text-white/90">What-if 模拟</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">What-if 模拟</h3>
       </div>
 
       {/* Sliders */}
@@ -64,9 +64,9 @@ export default function WhatIfSimulator({ className = '' }: Props) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Moon className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm text-white/70">睡眠时长</span>
+              <span className="text-sm text-[var(--text-secondary)]">睡眠时长</span>
             </div>
-            <span className="text-sm font-medium text-white/90">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               {sleepHours} 小时
             </span>
           </div>
@@ -77,7 +77,7 @@ export default function WhatIfSimulator({ className = '' }: Props) {
             step="0.5"
             value={sleepHours}
             onChange={(e) => setSleepHours(Number(e.target.value))}
-            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer slider"
           />
         </div>
 
@@ -86,9 +86,9 @@ export default function WhatIfSimulator({ className = '' }: Props) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm text-white/70">运动时长</span>
+              <span className="text-sm text-[var(--text-secondary)]">运动时长</span>
             </div>
-            <span className="text-sm font-medium text-white/90">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               {exerciseMinutes} 分钟
             </span>
           </div>
@@ -99,7 +99,7 @@ export default function WhatIfSimulator({ className = '' }: Props) {
             step="10"
             value={exerciseMinutes}
             onChange={(e) => setExerciseMinutes(Number(e.target.value))}
-            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer slider"
           />
         </div>
 
@@ -108,12 +108,12 @@ export default function WhatIfSimulator({ className = '' }: Props) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Coffee className="w-4 h-4 text-amber-400" />
-              <span className="text-sm text-white/70">下午咖啡因</span>
+              <span className="text-sm text-[var(--text-secondary)]">下午咖啡因</span>
             </div>
             <button
               onClick={() => setCaffeineAfter2pm(!caffeineAfter2pm)}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                caffeineAfter2pm ? 'bg-amber-500' : 'bg-white/20'
+                caffeineAfter2pm ? 'bg-amber-500' : 'bg-[var(--glass-bg)] border border-[var(--border)]'
               }`}
             >
               <div
@@ -130,9 +130,9 @@ export default function WhatIfSimulator({ className = '' }: Props) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Monitor className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-white/70">屏幕时间</span>
+              <span className="text-sm text-[var(--text-secondary)]">屏幕时间</span>
             </div>
-            <span className="text-sm font-medium text-white/90">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               {screenHours} 小时
             </span>
           </div>
@@ -143,7 +143,7 @@ export default function WhatIfSimulator({ className = '' }: Props) {
             step="1"
             value={screenHours}
             onChange={(e) => setScreenHours(Number(e.target.value))}
-            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer slider"
           />
         </div>
       </div>
@@ -152,7 +152,7 @@ export default function WhatIfSimulator({ className = '' }: Props) {
       <button
         onClick={runSimulation}
         disabled={loading}
-        className="w-full mt-6 py-3 px-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-white/10 rounded-xl text-white/90 font-medium hover:border-cyan-500/30 transition-all flex items-center justify-center gap-2"
+        className="w-full mt-6 py-3 px-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-[var(--border)] rounded-xl text-[var(--text-primary)] font-medium hover:border-cyan-500/30 transition-all flex items-center justify-center gap-2"
       >
         <Play className="w-4 h-4" />
         {loading ? '模拟中...' : '运行模拟'}
@@ -160,9 +160,9 @@ export default function WhatIfSimulator({ className = '' }: Props) {
 
       {/* Result */}
       {result && (
-        <div className="mt-6 pt-6 border-t border-white/10">
+        <div className="mt-6 pt-6 border-t border-[var(--border)]">
           <div className="text-center mb-4">
-            <div className="text-xs text-white/40 mb-1">预测 Vibe Score</div>
+            <div className="text-xs text-[var(--text-tertiary)] mb-1">预测 Vibe Score</div>
             <div
               className={`text-4xl font-bold ${
                 result.predicted_score >= 70
@@ -183,16 +183,16 @@ export default function WhatIfSimulator({ className = '' }: Props) {
                 key={idx}
                 className="flex items-center justify-between text-sm"
               >
-                <span className="text-white/50">{adj.factor}</span>
+                <span className="text-[var(--text-tertiary)]">{adj.factor}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/40">{adj.reason}</span>
+                  <span className="text-xs text-[var(--text-tertiary)]">{adj.reason}</span>
                   <span
                     className={
                       adj.impact > 0
                         ? 'text-emerald-400'
                         : adj.impact < 0
                         ? 'text-red-400'
-                        : 'text-white/50'
+                        : 'text-[var(--text-tertiary)]'
                     }
                   >
                     {adj.impact > 0 ? '+' : ''}
@@ -205,11 +205,11 @@ export default function WhatIfSimulator({ className = '' }: Props) {
 
           {/* Recommendations */}
           {result.recommendations && result.recommendations.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <div className="text-xs text-white/40 mb-2">优化建议</div>
+            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+              <div className="text-xs text-[var(--text-tertiary)] mb-2">优化建议</div>
               <ul className="space-y-1">
                 {result.recommendations.map((rec, idx) => (
-                  <li key={idx} className="text-sm text-white/70 flex gap-2">
+                  <li key={idx} className="text-sm text-[var(--text-secondary)] flex gap-2">
                     <span>•</span>
                     <span>{rec}</span>
                   </li>

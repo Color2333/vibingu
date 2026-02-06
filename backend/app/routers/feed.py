@@ -214,16 +214,22 @@ async def create_feed(
         logger.warning(f"[Phase 4] 标签生成失败: {e}")
         # 标签失败不影响记录保存
     
-    # ===== Phase 5: 八维度分析 =====
-    dimension_scores = {}
-    try:
-        dimension_scores = dimension_analyzer.calculate_dimension_scores(
-            category=category or "MOOD",
-            meta_data=meta_data,
-            tags=tags,
-        )
-    except Exception as e:
-        logger.warning(f"[Phase 5] 维度分析失败: {e}")
+    # ===== Phase 5: 八维度评分（LLM 驱动，规则引擎 fallback） =====
+    dimension_scores = extract_result.get("dimension_scores")
+    if dimension_scores:
+        logger.info(f"[Phase 5] 使用 LLM 维度评分: {dimension_scores}")
+    else:
+        # LLM 未返回评分，fallback 到规则引擎
+        try:
+            dimension_scores = dimension_analyzer.calculate_dimension_scores(
+                category=category or "MOOD",
+                meta_data=meta_data,
+                tags=tags,
+            )
+            logger.info(f"[Phase 5] Fallback 到规则引擎评分")
+        except Exception as e:
+            logger.warning(f"[Phase 5] 维度分析失败: {e}")
+            dimension_scores = {}
     
     # 确定记录发生时间
     record_time = extract_result.get("record_time")

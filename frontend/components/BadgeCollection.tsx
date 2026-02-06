@@ -61,10 +61,10 @@ export default function BadgeCollection({ className = '', showAll = false }: Pro
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
           <div className="grid grid-cols-4 gap-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 bg-white/5 rounded-xl"></div>
+              <div key={i} className="h-16 bg-[var(--glass-bg)] rounded-xl"></div>
             ))}
           </div>
         </div>
@@ -80,9 +80,9 @@ export default function BadgeCollection({ className = '', showAll = false }: Pro
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Award className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white/90">成就徽章</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">成就徽章</h3>
         </div>
-        <span className="text-xs text-white/40">
+        <span className="text-xs text-[var(--text-tertiary)]">
           {earnedCount} / {badges.length}
         </span>
       </div>
@@ -95,15 +95,15 @@ export default function BadgeCollection({ className = '', showAll = false }: Pro
             className={`relative p-3 rounded-xl border transition-all ${
               badge.earned
                 ? `${rarityColors[badge.rarity]} ${rarityGlow[badge.rarity]}`
-                : 'border-white/5 bg-white/5 opacity-40'
+                : 'border-[var(--border)] bg-[var(--glass-bg)] opacity-40'
             }`}
             title={badge.description}
           >
             <div className="text-center">
               <div className="text-2xl mb-1">
-                {badge.earned ? badge.icon : <Lock className="w-5 h-5 mx-auto text-white/30" />}
+                {badge.earned ? badge.icon : <Lock className="w-5 h-5 mx-auto text-[var(--text-tertiary)]" />}
               </div>
-              <div className="text-xs text-white/70 truncate">{badge.title}</div>
+              <div className="text-xs text-[var(--text-secondary)] truncate">{badge.title}</div>
             </div>
             
             {/* Rarity indicator */}
@@ -126,7 +126,7 @@ export default function BadgeCollection({ className = '', showAll = false }: Pro
       {badges.length > 8 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full mt-4 py-2 text-sm text-white/50 hover:text-white/70 transition-colors"
+          className="w-full mt-4 py-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
         >
           {expanded ? '收起' : `查看全部 ${badges.length} 个徽章`}
         </button>
@@ -134,7 +134,7 @@ export default function BadgeCollection({ className = '', showAll = false }: Pro
 
       {/* Badge descriptions on hover - could be a tooltip in future */}
       {earnedCount === 0 && (
-        <p className="text-center text-white/40 text-sm mt-4">
+        <p className="text-center text-[var(--text-tertiary)] text-sm mt-4">
           开始记录生活，解锁你的第一个徽章！
         </p>
       )}

@@ -7,12 +7,14 @@ import Link from 'next/link';
 interface VibeData {
   date: string;
   vibe_score: number | null;
+  dimension_averages: Record<string, number> | null;
   sleep_score: number | null;
   diet_score: number | null;
   screen_score: number | null;
   activity_score: number | null;
   insights: string[];
   record_count: number;
+  scoring_mode: string;
 }
 
 interface TrendData {
@@ -108,12 +110,34 @@ export default function PublicPage() {
 
         {/* Dimensions */}
         <section className="glass rounded-3xl p-6 mb-6">
-          <div className="grid grid-cols-4 gap-4">
-            <DimensionItem icon={<Moon className="w-4 h-4" />} label="睡眠" score={vibeData?.sleep_score ?? null} />
-            <DimensionItem icon={<Coffee className="w-4 h-4" />} label="饮食" score={vibeData?.diet_score ?? null} />
-            <DimensionItem icon={<Smartphone className="w-4 h-4" />} label="屏幕" score={vibeData?.screen_score ?? null} />
-            <DimensionItem icon={<Zap className="w-4 h-4" />} label="活动" score={vibeData?.activity_score ?? null} />
-          </div>
+          {vibeData?.scoring_mode === 'llm' && vibeData.dimension_averages ? (
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { key: 'body', label: '身体', emoji: '💪' },
+                { key: 'mood', label: '心情', emoji: '😊' },
+                { key: 'social', label: '社交', emoji: '👥' },
+                { key: 'work', label: '工作', emoji: '💼' },
+                { key: 'growth', label: '成长', emoji: '📚' },
+                { key: 'meaning', label: '意义', emoji: '🎯' },
+                { key: 'digital', label: '数字', emoji: '📱' },
+                { key: 'leisure', label: '休闲', emoji: '🎮' },
+              ].map((dim) => (
+                <DimensionItem
+                  key={dim.key}
+                  icon={<span className="text-sm">{dim.emoji}</span>}
+                  label={dim.label}
+                  score={vibeData.dimension_averages?.[dim.key] ?? null}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-4">
+              <DimensionItem icon={<Moon className="w-4 h-4" />} label="睡眠" score={vibeData?.sleep_score ?? null} />
+              <DimensionItem icon={<Coffee className="w-4 h-4" />} label="饮食" score={vibeData?.diet_score ?? null} />
+              <DimensionItem icon={<Smartphone className="w-4 h-4" />} label="屏幕" score={vibeData?.screen_score ?? null} />
+              <DimensionItem icon={<Zap className="w-4 h-4" />} label="活动" score={vibeData?.activity_score ?? null} />
+            </div>
+          )}
         </section>
 
         {/* Trend */}

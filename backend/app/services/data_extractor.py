@@ -25,8 +25,37 @@ def _get_concurrency_limiter():
     return _concurrency_limiter
 
 
+DIMENSION_SCORING_PROMPT = """
+【八维度评分 - 必须输出】
+请基于以上分析，为这条记录对用户生活各维度的影响打分（0-100）。
+不相关的维度设为 0，正面影响越大分数越高。
+
+维度说明：
+- body（身体）: 睡眠、饮食、运动对身体健康的影响
+- mood（心情）: 情绪状态的正面/负面程度
+- social（社交）: 人际互动、社会连接的质量
+- work（工作）: 工作效率、成就感
+- growth（成长）: 学习、技能提升、个人发展
+- meaning（意义）: 价值感、目标感、生活充实度
+- digital（数字）: 数字健康程度（屏幕时间少=高分）
+- leisure（休闲）: 放松恢复、心流体验
+
+在 JSON 输出中加入：
+"dimension_scores": {
+    "body": 0-100,
+    "mood": 0-100,
+    "social": 0-100,
+    "work": 0-100,
+    "growth": 0-100,
+    "meaning": 0-100,
+    "digital": 0-100,
+    "leisure": 0-100
+}
+"""
+
+
 class DataExtractor:
-    """根据图片类型提取结构化数据 + AI 深度分析"""
+    """根据图片类型提取结构化数据 + AI 深度分析 + LLM 驱动的八维度评分"""
     
     def __init__(self):
         api_key = settings.get_ai_api_key()
@@ -216,8 +245,10 @@ class DataExtractor:
     "suggestions": ["建议1（具体可行）", "建议2（如有必要）"],
     "trend": "up/down/stable（情绪/状态趋势判断）",
     "tags": ["标签1", "标签2", "标签3"],
-    "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【禁止】返回'已记录'这种空洞回复。"
-}}"""
+    "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【禁止】返回'已记录'这种空洞回复。",
+    "dimension_scores": {{"body": 0, "mood": 75, "social": 0, "work": 0, "growth": 0, "meaning": 30, "digital": 0, "leisure": 0}}
+}}
+""" + DIMENSION_SCORING_PROMPT
 
         return await self._call_ai(system_prompt, None, text, "MOOD", client_time)
     
@@ -262,9 +293,10 @@ class DataExtractor:
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["睡眠", "健康"],
-    "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。"
+    "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。",
+    "dimension_scores": {{"body": 80, "mood": 65, "social": 0, "work": 0, "growth": 0, "meaning": 20, "digital": 0, "leisure": 0}}
 }}
-
+""" + DIMENSION_SCORING_PROMPT + """
 【重要提示】：
 1. record_date 是这条睡眠记录归属的日期（入睡那天），record_time 是入睡的完整时间戳
 2. 入睡时间和苏醒时间是用户最关心的数据，请优先识别
@@ -322,9 +354,10 @@ class DataExtractor:
     "trend": "up/down/stable",
     "health_score": 60,
     "tags": ["屏幕时间", "数字健康"],
-    "reply_text": "一句有洞察的回复（15-30字），指出屏幕使用的关键问题或肯定健康习惯。【禁止】空洞的'已记录'。"
+    "reply_text": "一句有洞察的回复（15-30字），指出屏幕使用的关键问题或肯定健康习惯。【禁止】空洞的'已记录'。",
+    "dimension_scores": {{"body": 0, "mood": 40, "social": 0, "work": 30, "growth": 0, "meaning": 0, "digital": 60, "leisure": 30}}
 }}
-
+""" + DIMENSION_SCORING_PROMPT + """
 注意：
 1. **务必识别所有可见的 App 名称和时长**，这是最重要的数据
 2. 如果某项不可见，设为 null
@@ -360,9 +393,10 @@ class DataExtractor:
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
     "tags": ["运动", "健身"],
-    "reply_text": "一句有力的鼓励（15-30字），肯定运动成果或激励继续保持。【禁止】空洞的'已记录'。"
+    "reply_text": "一句有力的鼓励（15-30字），肯定运动成果或激励继续保持。【禁止】空洞的'已记录'。",
+    "dimension_scores": {{"body": 85, "mood": 70, "social": 0, "work": 0, "growth": 20, "meaning": 30, "digital": 0, "leisure": 40}}
 }}
-
+""" + DIMENSION_SCORING_PROMPT + """
 注意：record_time 应为运动实际发生的时间，如果截图显示是昨天的运动记录，应设为昨天的日期。"""
 
         return await self._call_ai(system_prompt, image_base64, text, "ACTIVITY", client_time)
@@ -408,9 +442,10 @@ class DataExtractor:
     "analysis": "营养分析（50-100字）：评估这餐的营养均衡性、热量是否合适、搭配是否健康等",
     "suggestions": ["具体建议1", "具体建议2"],
     "tags": ["饮食", "美食"],
-    "reply_text": "一句有趣的评价（15-30字），点评这餐的营养或美味程度。【禁止】空洞的'已记录'。"
+    "reply_text": "一句有趣的评价（15-30字），点评这餐的营养或美味程度。【禁止】空洞的'已记录'。",
+    "dimension_scores": {{"body": 70, "mood": 60, "social": 0, "work": 0, "growth": 0, "meaning": 20, "digital": 0, "leisure": 30}}
 }}
-
+""" + DIMENSION_SCORING_PROMPT + """
 注意：record_time 应为这餐实际发生的时间。如果用户说"昨天的午餐"，应设为昨天中午。"""
 
         return await self._call_ai(system_prompt, image_base64, text, "DIET", client_time)
@@ -457,8 +492,10 @@ class DataExtractor:
     "analysis": "深度分析（30-50字）：从照片推测用户状态、情绪、可能在做什么",
     "suggestions": ["如有需要的建议"],
     "tags": ["标签1", "标签2"],
-    "reply_text": "一句温暖、有洞察的回复（15-30字），反映照片传递的情绪或给予鼓励。【禁止】空洞的'已记录'。"
-}}"""
+    "reply_text": "一句温暖、有洞察的回复（15-30字），反映照片传递的情绪或给予鼓励。【禁止】空洞的'已记录'。",
+    "dimension_scores": {{"body": 0, "mood": 70, "social": 0, "work": 0, "growth": 0, "meaning": 30, "digital": 0, "leisure": 50}}
+}}
+""" + DIMENSION_SCORING_PROMPT
 
         result = await self._call_ai(system_prompt, image_base64, text, category_map.get(image_type, "MOOD"), client_time)
         return result
@@ -521,6 +558,21 @@ class DataExtractor:
             else:
                 result = json.loads(content)
             
+            # 提取 dimension_scores（LLM 驱动评分）
+            dimension_scores = result.pop("dimension_scores", None)
+            if dimension_scores and isinstance(dimension_scores, dict):
+                # 校验并清洗：确保所有值在 0-100 且 key 合法
+                valid_dims = {"body", "mood", "social", "work", "growth", "meaning", "digital", "leisure"}
+                dimension_scores = {
+                    k: max(0, min(100, int(v)))
+                    for k, v in dimension_scores.items()
+                    if k in valid_dims and isinstance(v, (int, float))
+                }
+                if len(dimension_scores) < 4:
+                    dimension_scores = None  # 太少的维度说明 LLM 没正确输出
+            else:
+                dimension_scores = None
+            
             # 确保 analysis 和 suggestions 存在
             meta_data = {k: v for k, v in result.items() if k not in ["reply_text", "record_time", "record_date"]}
             if "analysis" not in meta_data:
@@ -539,6 +591,7 @@ class DataExtractor:
                 "meta_data": meta_data,
                 "reply_text": result.get("reply_text", "已记录"),
                 "record_time": record_time,
+                "dimension_scores": dimension_scores,
             }
         finally:
             # 释放实际使用的模型的并发许可
@@ -551,7 +604,7 @@ class DataExtractor:
         content_hint: Optional[str],
         client_time: Optional[str] = None
     ) -> Dict[str, Any]:
-        """模拟数据提取（无 API 时）"""
+        """模拟数据提取（无 API 时），dimension_scores 为 None 表示需要 fallback"""
         
         time_period = self._get_time_period(client_time)
         
@@ -566,6 +619,7 @@ class DataExtractor:
                     "top_apps": [],
                 },
                 "reply_text": "截图已记录。配置 AI API Key 可自动识别屏幕时间和 App 排行。",
+                "dimension_scores": None,
             }
         elif image_type == "food":
             return {
@@ -576,6 +630,7 @@ class DataExtractor:
                     "suggestions": [],
                 },
                 "reply_text": "美食已记录！配置 API Key 可自动识别热量和营养成分。",
+                "dimension_scores": None,
             }
         elif image_type in ["activity_screenshot", "activity_photo"]:
             return {
@@ -586,6 +641,7 @@ class DataExtractor:
                     "suggestions": [],
                 },
                 "reply_text": "运动记录已保存！",
+                "dimension_scores": None,
             }
         elif image_type == "sleep_screenshot":
             return {
@@ -596,6 +652,7 @@ class DataExtractor:
                     "suggestions": [],
                 },
                 "reply_text": "睡眠数据已记录！配置 API Key 可自动识别和分析。",
+                "dimension_scores": None,
             }
         else:
             # 纯文本或其他
@@ -607,4 +664,5 @@ class DataExtractor:
                     "suggestions": [],
                 },
                 "reply_text": f"已记录。{time_period}好！",
+                "dimension_scores": None,
             }

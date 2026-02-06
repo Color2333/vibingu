@@ -7,9 +7,9 @@ import AnalyticsPage from '@/components/pages/AnalyticsPage';
 import InsightsPage from '@/components/pages/InsightsPage';
 import AchievementsPage from '@/components/pages/AchievementsPage';
 import SettingsPage from '@/components/pages/SettingsPage';
+import ChatPage from '@/components/pages/ChatPage';
 import LoginScreen from '@/components/LoginScreen';
 import PublicFeedPage from '@/components/pages/PublicFeedPage';
-import ChatAssistant from '@/components/ChatAssistant';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -74,6 +74,8 @@ export default function Home() {
         return <InsightsPage refreshKey={refreshKey} />;
       case 'achievements':
         return <AchievementsPage refreshKey={refreshKey} />;
+      case 'chat':
+        return <ChatPage />;
       case 'settings':
         return <SettingsPage />;
       default:
@@ -97,8 +99,18 @@ export default function Home() {
         </div>
       </main>
 
-      {/* AI 对话助手 - 浮动按钮 */}
-      <ChatAssistant />
+      {/* AI 对话 - 快捷浮动入口（非 chat 页面才显示） */}
+      {currentPage !== 'chat' && (
+        <button
+          onClick={() => setCurrentPage('chat')}
+          className="fixed bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-gradient-to-r from-purple-500/80 to-cyan-500/80 shadow-lg flex items-center justify-center hover:scale-110 transition-all"
+          aria-label="打开 AI 对话"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-white">
+            <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

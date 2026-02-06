@@ -13,11 +13,12 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  MessageCircle
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
-export type PageId = 'record' | 'analytics' | 'insights' | 'achievements' | 'settings';
+export type PageId = 'record' | 'analytics' | 'insights' | 'achievements' | 'chat' | 'settings';
 
 interface SidebarProps {
   currentPage: PageId;
@@ -49,6 +50,12 @@ const navItems: { id: PageId; icon: React.ReactNode; label: string; description:
     icon: <Trophy className="w-5 h-5" />, 
     label: '成就',
     description: '目标与徽章'
+  },
+  { 
+    id: 'chat', 
+    icon: <MessageCircle className="w-5 h-5" />, 
+    label: 'AI 对话',
+    description: '智能助手'
   },
   { 
     id: 'settings', 

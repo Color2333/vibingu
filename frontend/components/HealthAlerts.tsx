@@ -70,8 +70,8 @@ export default function HealthAlerts({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-20 bg-white/5 rounded"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-20 bg-[var(--glass-bg)] rounded"></div>
         </div>
       </div>
     );
@@ -82,12 +82,12 @@ export default function HealthAlerts({ className = '' }: Props) {
       <div className={`glass-card p-6 ${className}`}>
         <div className="flex items-center gap-2 mb-4">
           <Heart className="w-5 h-5 text-emerald-400" />
-          <h3 className="text-lg font-semibold text-white/90">健康提醒</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">健康提醒</h3>
         </div>
         <div className="text-center py-6">
           <div className="text-3xl mb-2">✨</div>
-          <p className="text-white/70">一切正常</p>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-[var(--text-secondary)]">一切正常</p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1">
             保持良好的生活习惯
           </p>
         </div>
@@ -100,9 +100,9 @@ export default function HealthAlerts({ className = '' }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Heart className="w-5 h-5 text-rose-400" />
-          <h3 className="text-lg font-semibold text-white/90">健康提醒</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">健康提醒</h3>
         </div>
-        <span className="text-xs text-white/40">
+        <span className="text-xs text-[var(--text-tertiary)]">
           {visibleAlerts.length} 条提醒
         </span>
       </div>
@@ -119,7 +119,7 @@ export default function HealthAlerts({ className = '' }: Props) {
             >
               <button
                 onClick={() => dismissAlert(alert.type)}
-                className="absolute top-2 right-2 p-1 text-white/30 hover:text-white/60 transition-colors"
+                className="absolute top-2 right-2 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -131,12 +131,12 @@ export default function HealthAlerts({ className = '' }: Props) {
                 <div className="flex-1 pr-6">
                   <div className="flex items-center gap-2 mb-1">
                     <IconComponent className={`w-4 h-4 ${style.iconColor}`} />
-                    <span className="font-medium text-white/90">
+                    <span className="font-medium text-[var(--text-primary)]">
                       {alert.title}
                     </span>
                   </div>
-                  <p className="text-sm text-white/60 mb-2">{alert.message}</p>
-                  <p className="text-xs text-white/40 bg-white/5 rounded-lg px-3 py-2">
+                  <p className="text-sm text-[var(--text-secondary)] mb-2">{alert.message}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] bg-[var(--glass-bg)] rounded-lg px-3 py-2">
                     💡 {alert.suggestion}
                   </p>
                 </div>

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { useTheme } from '@/hooks/useTheme';
 
 interface DailyStats {
   name: string;
@@ -36,6 +37,9 @@ interface Props {
 export default function WeeklyPattern({ className = '' }: Props) {
   const [data, setData] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { resolvedTheme } = useTheme();
+
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     fetchData();
@@ -59,8 +63,8 @@ export default function WeeklyPattern({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-48 bg-white/5 rounded"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-48 bg-[var(--glass-bg)] rounded"></div>
         </div>
       </div>
     );
@@ -69,11 +73,19 @@ export default function WeeklyPattern({ className = '' }: Props) {
   if (!data) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-white/90 mb-4">周模式分析</h3>
-        <p className="text-white/50 text-center py-8">暂无数据</p>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">周模式分析</h3>
+        <p className="text-[var(--text-tertiary)] text-center py-8">暂无数据</p>
       </div>
     );
   }
+
+  // Theme-aware chart colors
+  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+  const axisTickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+  const axisLineColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const tooltipBg = isDark ? 'rgba(15,15,20,0.95)' : 'rgba(255,255,255,0.95)';
+  const tooltipBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const tooltipText = isDark ? '#fff' : '#1a1a2e';
 
   // Prepare chart data
   const chartData = Object.entries(data.daily_stats)
@@ -88,29 +100,29 @@ export default function WeeklyPattern({ className = '' }: Props) {
   return (
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">周模式分析</h3>
-        <span className="text-xs text-white/40">最近 {data.period_weeks} 周</span>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">周模式分析</h3>
+        <span className="text-xs text-[var(--text-tertiary)]">最近 {data.period_weeks} 周</span>
       </div>
 
       {/* Stats row */}
-      <div className="flex gap-4 mb-4">
-        <div className="flex-1 p-3 rounded-lg bg-white/5">
-          <div className="text-xs text-white/40">工作日平均</div>
-          <div className="text-xl font-semibold text-white/90">
+      <div className="flex gap-3 mb-4">
+        <div className="flex-1 p-3 rounded-lg bg-[var(--glass-bg)]">
+          <div className="text-xs text-[var(--text-tertiary)]">工作日平均</div>
+          <div className="text-xl font-semibold text-[var(--text-primary)]">
             {data.weekday_avg}
           </div>
         </div>
-        <div className="flex-1 p-3 rounded-lg bg-white/5">
-          <div className="text-xs text-white/40">周末平均</div>
-          <div className="text-xl font-semibold text-white/90">
+        <div className="flex-1 p-3 rounded-lg bg-[var(--glass-bg)]">
+          <div className="text-xs text-[var(--text-tertiary)]">周末平均</div>
+          <div className="text-xl font-semibold text-[var(--text-primary)]">
             {data.weekend_avg}
           </div>
         </div>
-        <div className="flex-1 p-3 rounded-lg bg-white/5">
-          <div className="text-xs text-white/40">周末提升</div>
+        <div className="flex-1 p-3 rounded-lg bg-[var(--glass-bg)]">
+          <div className="text-xs text-[var(--text-tertiary)]">周末提升</div>
           <div
             className={`text-xl font-semibold ${
-              data.weekend_boost > 0 ? 'text-emerald-400' : 'text-red-400'
+              data.weekend_boost > 0 ? 'text-emerald-400' : 'text-rose-400'
             }`}
           >
             {data.weekend_boost > 0 ? '+' : ''}
@@ -123,25 +135,26 @@ export default function WeeklyPattern({ className = '' }: Props) {
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
             <XAxis
               dataKey="name"
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
-              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              tick={{ fill: axisTickColor, fontSize: 12 }}
+              axisLine={{ stroke: axisLineColor }}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              tick={{ fill: axisTickColor, fontSize: 10 }}
+              axisLine={{ stroke: axisLineColor }}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'rgba(0,0,0,0.9)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                color: 'white',
+                backgroundColor: tooltipBg,
+                border: `1px solid ${tooltipBorder}`,
+                borderRadius: '10px',
+                color: tooltipText,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
               }}
-              formatter={(value, name) => [
+              formatter={(value) => [
                 `${Number(value).toFixed(1)}分`,
                 '平均得分',
               ]}
@@ -163,16 +176,16 @@ export default function WeeklyPattern({ className = '' }: Props) {
       </div>
 
       {/* Best/Worst day */}
-      <div className="flex justify-between mt-4 pt-4 border-t border-white/10 text-sm">
+      <div className="flex justify-between mt-4 pt-4 border-t border-[var(--border)] text-sm">
         <div>
-          <span className="text-white/40">最佳日:</span>
-          <span className="text-emerald-400 ml-2 font-medium">
+          <span className="text-[var(--text-tertiary)]">最佳日:</span>
+          <span className="text-emerald-500 dark:text-emerald-400 ml-2 font-medium">
             {data.best_day.day} ({data.best_day.score}分)
           </span>
         </div>
         <div>
-          <span className="text-white/40">关注日:</span>
-          <span className="text-amber-400 ml-2 font-medium">
+          <span className="text-[var(--text-tertiary)]">关注日:</span>
+          <span className="text-amber-500 dark:text-amber-400 ml-2 font-medium">
             {data.worst_day.day} ({data.worst_day.score}分)
           </span>
         </div>

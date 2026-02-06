@@ -118,6 +118,159 @@ class AIAnalyzer:
         finally:
             db.close()
     
+    async def generate_daily_digest(self) -> Dict[str, Any]:
+        """
+        生成今日 AI 综合洞察（合并了健康提醒 + 异常检测 + 建议）
+        """
+        db = self._get_db()
+        try:
+            # 获取今日数据
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_records = db.query(LifeStream).filter(
+                LifeStream.created_at >= today_start,
+                LifeStream.is_deleted == False,
+            ).order_by(LifeStream.created_at.desc()).all()
+
+            # 获取近 7 天数据做对比
+            week_start = datetime.now() - timedelta(days=7)
+            week_records = db.query(LifeStream).filter(
+                LifeStream.created_at >= week_start,
+                LifeStream.is_deleted == False,
+            ).order_by(LifeStream.created_at.desc()).all()
+
+            if not today_records and not week_records:
+                return {
+                    "has_data": False,
+                    "status_summary": "还没有记录，开始记录你的生活吧！",
+                    "findings": [],
+                    "suggestions": [],
+                    "encouragement": "每一次记录都是对自己的关注",
+                }
+
+            today_summary = self._summarize_records(today_records) if today_records else {}
+            week_summary = self._summarize_records(week_records) if week_records else {}
+
+            # 收集今日维度分数
+            today_dimensions = []
+            for r in today_records:
+                if r.dimension_scores and isinstance(r.dimension_scores, dict):
+                    today_dimensions.append({
+                        "category": r.category,
+                        "scores": r.dimension_scores,
+                        "insight": (r.ai_insight or "")[:80],
+                    })
+
+            if not self.has_ai:
+                return self._mock_daily_digest(today_summary, week_summary)
+
+            return await self._ai_daily_digest(today_summary, week_summary, today_dimensions)
+        finally:
+            db.close()
+
+    async def _ai_daily_digest(
+        self,
+        today: Dict,
+        week: Dict,
+        dimensions: List[Dict],
+    ) -> Dict[str, Any]:
+        """LLM 生成综合每日洞察"""
+        prompt = f"""你是 Vibing u 的私人生活分析师。请基于用户今日和本周的数据，生成一份简洁的综合洞察报告。
+
+【今日数据】
+- 记录数: {today.get('total_records', 0)}
+- 分类: {json.dumps(today.get('categories', {}), ensure_ascii=False)}
+- 心情: {today.get('moods', [])[:5] or '未记录'}
+- 睡眠: {json.dumps(today.get('sleep_data', [])[:2], ensure_ascii=False) or '未记录'}
+- 屏幕: {json.dumps(today.get('screen_data', [])[:2], ensure_ascii=False) or '未记录'}
+- 运动: {json.dumps(today.get('activity_data', [])[:2], ensure_ascii=False) or '未记录'}
+- 维度评分: {json.dumps(dimensions[:5], ensure_ascii=False) if dimensions else '无'}
+
+【近7天参照】
+- 总记录: {week.get('total_records', 0)}
+- 分类分布: {json.dumps(week.get('categories', {}), ensure_ascii=False)}
+- 标签: {list(week.get('tags', {}).keys())[:10]}
+
+请以 JSON 格式输出：
+{{
+    "status_summary": "一句话概括今日整体状态（15-30字，要有温度）",
+    "status_emoji": "一个代表今日状态的 emoji",
+    "findings": [
+        {{
+            "type": "positive/warning/neutral",
+            "icon": "emoji",
+            "title": "发现标题（5-10字）",
+            "detail": "具体说明（20-40字），基于数据"
+        }}
+    ],
+    "suggestions": [
+        {{
+            "icon": "emoji",
+            "action": "具体建议（10-20字）",
+            "reason": "原因（10-15字）"
+        }}
+    ],
+    "encouragement": "一句温暖的鼓励（15-25字）"
+}}
+
+要求：
+1. findings 2-4 条，正面/警告/中性混合，必须基于实际数据
+2. suggestions 2-3 条，具体可行
+3. 语气温暖但不空洞，像朋友一样
+4. 如果今日数据少，可以结合本周数据分析"""
+
+        try:
+            result = await self.ai_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": "生成今日洞察报告，只输出JSON。"}
+                ],
+                max_tokens=1500,
+                task_type="daily_digest",
+                task_description="今日 AI 洞察",
+                json_response=True,
+            )
+
+            content = result["content"]
+            if not content:
+                return self._mock_daily_digest(today, week)
+
+            if isinstance(content, dict):
+                content["has_data"] = True
+                return content
+
+            try:
+                parsed = json.loads(content)
+                parsed["has_data"] = True
+                return parsed
+            except json.JSONDecodeError:
+                return self._mock_daily_digest(today, week)
+
+        except Exception as e:
+            logger.error(f"Daily digest 生成错误: {e}")
+            return self._mock_daily_digest(today, week)
+
+    def _mock_daily_digest(self, today: Dict, week: Dict) -> Dict[str, Any]:
+        """无 AI 时的 fallback"""
+        total = today.get("total_records", 0)
+        cats = today.get("categories", {})
+        findings = []
+
+        if cats.get("SLEEP"):
+            findings.append({"type": "positive", "icon": "😴", "title": "睡眠已记录", "detail": f"今天记录了 {cats['SLEEP']} 条睡眠数据"})
+        if cats.get("ACTIVITY"):
+            findings.append({"type": "positive", "icon": "🏃", "title": "运动打卡", "detail": f"今天运动了 {cats['ACTIVITY']} 次"})
+        if not cats.get("ACTIVITY") and week.get("categories", {}).get("ACTIVITY", 0) < 2:
+            findings.append({"type": "warning", "icon": "⚡", "title": "运动不足", "detail": "本周运动次数较少，建议增加活动量"})
+
+        return {
+            "has_data": total > 0 or week.get("total_records", 0) > 0,
+            "status_summary": f"今天已记录 {total} 条数据" if total else "今天还没有记录",
+            "status_emoji": "📊" if total else "🌅",
+            "findings": findings or [{"type": "neutral", "icon": "📝", "title": "开始记录", "detail": "记录生活数据，解锁 AI 洞察"}],
+            "suggestions": [{"icon": "💡", "action": "记录今天的生活", "reason": "数据越多分析越准确"}],
+            "encouragement": "每一次记录都是对自己的关注",
+        }
+
     async def deep_insight(self, question: str) -> Dict[str, Any]:
         """
         基于用户问题进行深度洞察

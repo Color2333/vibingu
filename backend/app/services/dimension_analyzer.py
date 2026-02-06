@@ -1,10 +1,8 @@
 """八维度生活模型分析器
 
-基于理论框架：
-- PERMA+ (积极心理学)
-- SDT 自我决定理论
-- 生命之轮
-- 数字健康
+评分策略（优先级）：
+1. LLM 驱动：由 DataExtractor 在分析记录时直接输出维度评分（推荐）
+2. 规则引擎 Fallback：当 LLM 未返回评分时，使用基于分类/元数据/标签的规则计算
 
 八大维度：
 1. 身体 (Body) - 睡眠、饮食、运动
@@ -16,6 +14,7 @@
 7. 数字 (Digital) - 屏幕时间、数字健康
 8. 休闲 (Leisure) - 心流体验、娱乐放松
 """
+import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -23,6 +22,7 @@ from sqlalchemy import func, and_
 
 from app.database import SessionLocal
 
+logger = logging.getLogger(__name__)
 
 # 维度定义
 DIMENSIONS = {
@@ -65,7 +65,7 @@ DIMENSIONS = {
         "name": "意义",
         "icon": "🎯",
         "description": "价值感、目标导向",
-        "categories": [],  # 从多个维度综合
+        "categories": [],
         "weight": 0.10
     },
     "digital": {
@@ -84,9 +84,36 @@ DIMENSIONS = {
     }
 }
 
+# 分类 → 主维度映射
+CATEGORY_TO_DIMENSION = {
+    "SLEEP": "body",
+    "DIET": "body",
+    "ACTIVITY": "body",
+    "MOOD": "mood",
+    "SOCIAL": "social",
+    "WORK": "work",
+    "GROWTH": "growth",
+    "SCREEN": "digital",
+    "LEISURE": "leisure",
+}
+
+# 分类 → 次要维度影响（带默认增益）
+CATEGORY_SECONDARY = {
+    "SLEEP": {"mood": 15},
+    "ACTIVITY": {"mood": 15, "leisure": 10},
+    "SOCIAL": {"mood": 15, "meaning": 10},
+    "GROWTH": {"meaning": 20, "work": 10},
+    "LEISURE": {"mood": 10, "meaning": 5},
+    "WORK": {"growth": 10},
+}
+
 
 class DimensionAnalyzer:
-    """八维度分析器"""
+    """八维度分析器
+    
+    主要作为 LLM 评分失败时的 fallback。
+    日常评分优先使用 DataExtractor 的 LLM 输出。
+    """
     
     def __init__(self):
         self.db: Session = SessionLocal()
@@ -102,45 +129,31 @@ class DimensionAnalyzer:
         tags: Optional[List[str]] = None
     ) -> Dict[str, float]:
         """
-        根据单条记录计算对各维度的贡献分数
+        规则引擎评分（LLM 未返回时的 fallback）
         
-        Args:
-            category: 记录分类
-            meta_data: 记录元数据
-            tags: 标签列表
-            
-        Returns:
-            各维度的贡献分数 (0-100)
+        策略：基于分类给主维度基础分 → 次要维度小幅加分 → 元数据微调
         """
         scores = {dim: 0.0 for dim in DIMENSIONS.keys()}
         
-        # 基于分类的直接贡献
-        category_to_dimension = {
-            "SLEEP": "body",
-            "DIET": "body",
-            "ACTIVITY": "body",
-            "MOOD": "mood",
-            "SOCIAL": "social",
-            "WORK": "work",
-            "GROWTH": "growth",
-            "SCREEN": "digital",
-            "LEISURE": "leisure"
-        }
-        
-        primary_dim = category_to_dimension.get(category)
+        # 1. 主维度基础分
+        primary_dim = CATEGORY_TO_DIMENSION.get(category)
         if primary_dim:
-            scores[primary_dim] = 70  # 基础分
+            scores[primary_dim] = 65  # 基础分
         
-        # 基于 meta_data 调整分数
+        # 2. 次要维度加分
+        for dim, bonus in CATEGORY_SECONDARY.get(category, {}).items():
+            scores[dim] += bonus
+        
+        # 3. 元数据微调
         if meta_data:
             scores = self._adjust_by_metadata(scores, category, meta_data)
         
-        # 基于标签调整分数
-        if tags:
-            scores = self._adjust_by_tags(scores, tags)
+        # 4. 意义维度综合计算
+        scores["meaning"] = max(scores["meaning"], self._calc_meaning(scores))
         
-        # 计算意义维度（综合其他维度）
-        scores["meaning"] = self._calculate_meaning_score(scores, meta_data)
+        # 归一化到 0-100
+        for dim in scores:
+            scores[dim] = max(0, min(100, scores[dim]))
         
         return scores
     
@@ -150,132 +163,64 @@ class DimensionAnalyzer:
         category: str,
         meta_data: Dict
     ) -> Dict[str, float]:
-        """根据元数据调整分数"""
+        """根据元数据微调评分"""
         
         if category == "SLEEP":
-            # 睡眠评估
             duration = meta_data.get("duration_hours", 7)
-            quality = meta_data.get("quality", "normal")
+            if isinstance(duration, (int, float)):
+                if 7 <= duration <= 9:
+                    scores["body"] += 20
+                elif duration < 6:
+                    scores["body"] -= 10
+                    scores["mood"] -= 5
             
-            if 7 <= duration <= 9:
-                scores["body"] += 20
-            elif duration < 6:
-                scores["body"] -= 10
-            
+            quality = meta_data.get("quality", "")
             if quality == "good":
                 scores["body"] += 10
-                scores["mood"] += 15
+                scores["mood"] += 10
             elif quality == "poor":
+                scores["body"] -= 5
                 scores["mood"] -= 10
         
         elif category == "DIET":
-            # 饮食评估
-            is_healthy = meta_data.get("is_healthy", True)
-            has_caffeine = meta_data.get("caffeine_mg", 0) > 0
-            
-            if is_healthy:
+            is_healthy = meta_data.get("is_healthy")
+            if is_healthy is True:
                 scores["body"] += 15
-            else:
+            elif is_healthy is False:
                 scores["body"] -= 5
-            
-            if has_caffeine and datetime.now().hour >= 15:
-                scores["body"] -= 5  # 下午咖啡因可能影响睡眠
         
         elif category == "ACTIVITY":
-            # 运动评估
-            duration = meta_data.get("duration_minutes", 30)
-            intensity = meta_data.get("intensity", "moderate")
-            
-            if duration >= 30:
-                scores["body"] += 20
-                scores["mood"] += 10
-            
-            if intensity == "high":
-                scores["body"] += 10
+            duration = meta_data.get("duration_minutes", 0)
+            if isinstance(duration, (int, float)) and duration >= 30:
+                scores["body"] += 15
+                scores["mood"] += 5
         
-        elif category == "GROWTH":
-            # 学习/成长评估
-            scores["meaning"] += 20
-            scores["mood"] += 10
-        
-        elif category == "SOCIAL":
-            # 社交评估
-            quality = meta_data.get("quality", "good")
-            if quality == "good":
-                scores["mood"] += 15
-                scores["meaning"] += 10
-        
-        # 确保分数在 0-100 范围内
-        for dim in scores:
-            scores[dim] = max(0, min(100, scores[dim]))
+        elif category == "SCREEN":
+            total_minutes = meta_data.get("total_minutes", 0)
+            if isinstance(total_minutes, (int, float)):
+                if total_minutes <= 120:
+                    scores["digital"] += 25  # 屏幕时间短=高分
+                elif total_minutes >= 360:
+                    scores["digital"] -= 20  # 过长=低分
         
         return scores
     
-    def _adjust_by_tags(
-        self,
-        scores: Dict[str, float],
-        tags: List[str]
-    ) -> Dict[str, float]:
-        """根据标签调整分数"""
-        
-        # 正面标签增益
-        positive_tags = {
-            "#心情/开心": ("mood", 15),
-            "#心情/满足": ("mood", 10),
-            "#心情/平静": ("mood", 10),
-            "#身体/精力充沛": ("body", 15),
-            "#成长/学习": ("growth", 15),
-            "#习惯/好习惯": ("meaning", 10),
-            "#社交/朋友": ("social", 15),
-            "#社交/家人": ("social", 15),
-        }
-        
-        # 负面标签减益
-        negative_tags = {
-            "#心情/焦虑": ("mood", -15),
-            "#心情/烦躁": ("mood", -10),
-            "#心情/沮丧": ("mood", -20),
-            "#身体/疲劳": ("body", -15),
-            "#工作/拖延": ("work", -15),
-            "#习惯/坏习惯": ("meaning", -10),
-        }
-        
-        for tag in tags:
-            if tag in positive_tags:
-                dim, value = positive_tags[tag]
-                scores[dim] += value
-            elif tag in negative_tags:
-                dim, value = negative_tags[tag]
-                scores[dim] += value
-        
-        # 确保分数在 0-100 范围内
-        for dim in scores:
-            scores[dim] = max(0, min(100, scores[dim]))
-        
-        return scores
-    
-    def _calculate_meaning_score(
-        self,
-        scores: Dict[str, float],
-        meta_data: Optional[Dict]
-    ) -> float:
-        """计算意义维度分数（综合指标）"""
-        # 意义 = 成长贡献 + 社交贡献 + 工作贡献的加权平均
-        meaning_base = (
-            scores.get("growth", 0) * 0.3 +
-            scores.get("social", 0) * 0.2 +
-            scores.get("work", 0) * 0.2 +
+    @staticmethod
+    def _calc_meaning(scores: Dict[str, float]) -> float:
+        """意义维度 = 其他有价值维度的加权综合"""
+        return (
+            scores.get("growth", 0) * 0.30 +
+            scores.get("social", 0) * 0.20 +
+            scores.get("work", 0) * 0.20 +
             scores.get("leisure", 0) * 0.15 +
             scores.get("mood", 0) * 0.15
         )
-        
-        return min(100, max(0, meaning_base))
     
     def get_daily_dimension_summary(
         self,
         date: Optional[datetime] = None
     ) -> Dict[str, Any]:
-        """获取某日的八维度汇总"""
+        """获取某日的八维度汇总（聚合所有记录的维度分数）"""
         from app.models.life_stream import LifeStream
         
         if date is None:
@@ -303,13 +248,13 @@ class DimensionAnalyzer:
         # 计算各维度平均分
         result = {}
         for dim, dim_info in DIMENSIONS.items():
-            scores = dimension_totals[dim]
-            avg_score = sum(scores) / len(scores) if scores else 50  # 默认 50 分
+            dim_scores = dimension_totals[dim]
+            avg_score = sum(dim_scores) / len(dim_scores) if dim_scores else 50
             result[dim] = {
                 "name": dim_info["name"],
                 "icon": dim_info["icon"],
                 "score": round(avg_score, 1),
-                "record_count": len(scores)
+                "record_count": len(dim_scores)
             }
         
         # 计算综合 Vibe Score

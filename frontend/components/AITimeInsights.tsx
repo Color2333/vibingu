@@ -169,7 +169,7 @@ export default function AITimeInsights() {
             onClick={() => setActiveTab(id as typeof activeTab)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
               activeTab === id
-                ? 'bg-violet-500/20 text-violet-300'
+                ? 'bg-violet-500/20 text-violet-600 dark:text-violet-300'
                 : 'text-[var(--text-tertiary)] hover:bg-[var(--glass-bg)]'
             }`}
           >
@@ -227,7 +227,7 @@ export default function AITimeInsights() {
                 {ai_insights.efficiency_tips.map((tip, i) => (
                   <div
                     key={i}
-                    className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm text-amber-200"
+                    className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm text-amber-700 dark:text-amber-200"
                   >
                     {tip}
                   </div>
@@ -247,7 +247,7 @@ export default function AITimeInsights() {
                 {ai_insights.health_suggestions.map((suggestion, i) => (
                   <div
                     key={i}
-                    className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-200"
+                    className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-700 dark:text-red-200"
                   >
                     {suggestion}
                   </div>
@@ -282,20 +282,20 @@ export default function AITimeInsights() {
       {activeTab === 'schedule' && ai_insights?.optimal_schedule && (
         <div className="space-y-3">
           {[
-            { key: 'focus_work', label: '专注工作', icon: '🎯', color: 'violet' },
-            { key: 'creative_work', label: '创意工作', icon: '💡', color: 'amber' },
-            { key: 'exercise', label: '运动锻炼', icon: '🏃', color: 'green' },
-            { key: 'rest', label: '休息放松', icon: '😴', color: 'blue' },
-          ].map(({ key, label, icon, color }) => (
+            { key: 'focus_work', label: '专注工作', icon: '🎯', cls: 'bg-violet-500/10 border-violet-500/20' },
+            { key: 'creative_work', label: '创意工作', icon: '💡', cls: 'bg-amber-500/10 border-amber-500/20' },
+            { key: 'exercise', label: '运动锻炼', icon: '🏃', cls: 'bg-green-500/10 border-green-500/20' },
+            { key: 'rest', label: '休息放松', icon: '😴', cls: 'bg-blue-500/10 border-blue-500/20' },
+          ].map(({ key, label, icon, cls }) => (
             <div
               key={key}
-              className={`flex items-center justify-between p-4 rounded-xl bg-${color}-500/10 border border-${color}-500/20`}
+              className={`flex items-center justify-between p-4 rounded-xl border ${cls}`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{icon}</span>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
               </div>
-              <span className={`text-sm text-${color}-300`}>
+              <span className="text-sm font-medium text-[var(--text-primary)]">
                 {ai_insights.optimal_schedule[key as keyof typeof ai_insights.optimal_schedule]}
               </span>
             </div>
@@ -312,7 +312,7 @@ export default function AITimeInsights() {
                 {data_summary.peak_hours.map((hour) => (
                   <span
                     key={hour}
-                    className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-sm"
+                    className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 text-sm"
                   >
                     {hour}:00
                   </span>
@@ -326,7 +326,7 @@ export default function AITimeInsights() {
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <div className="text-xs text-[var(--text-tertiary)] mb-1">最佳状态日</div>
-                <div className="text-lg font-semibold text-emerald-300">
+                <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-300">
                   {data_summary.best_day.day}
                 </div>
                 <div className="text-xs text-[var(--text-tertiary)]">
@@ -335,7 +335,7 @@ export default function AITimeInsights() {
               </div>
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                 <div className="text-xs text-[var(--text-tertiary)] mb-1">需要注意日</div>
-                <div className="text-lg font-semibold text-red-300">
+                <div className="text-lg font-semibold text-rose-600 dark:text-rose-300">
                   {data_summary.worst_day.day}
                 </div>
                 <div className="text-xs text-[var(--text-tertiary)]">
@@ -393,7 +393,7 @@ export default function AITimeInsights() {
                   className="flex items-center gap-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20 mb-2"
                 >
                   <Bell className="w-4 h-4 text-violet-400" />
-                  <span className="text-sm text-violet-200 font-medium">{reminder.time}</span>
+                  <span className="text-sm text-violet-600 dark:text-violet-200 font-medium">{reminder.time}</span>
                   <span className="text-sm text-[var(--text-secondary)]">{reminder.message}</span>
                 </div>
               ))}

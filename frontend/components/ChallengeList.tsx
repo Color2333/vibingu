@@ -47,10 +47,10 @@ export default function ChallengeList({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-white/5 rounded-xl"></div>
+              <div key={i} className="h-20 bg-[var(--glass-bg)] rounded-xl"></div>
             ))}
           </div>
         </div>
@@ -66,16 +66,16 @@ export default function ChallengeList({ className = '' }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Target className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-lg font-semibold text-white/90">本周挑战</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">本周挑战</h3>
         </div>
-        <span className="text-xs text-white/40">
+        <span className="text-xs text-[var(--text-tertiary)]">
           {completedCount} / {challenges.length} 完成
         </span>
       </div>
 
       {/* Challenge list */}
       {challenges.length === 0 ? (
-        <p className="text-center text-white/40 py-8">暂无挑战</p>
+        <p className="text-center text-[var(--text-tertiary)] py-8">暂无挑战</p>
       ) : (
         <div className="space-y-3">
           {challenges.map((challenge) => (
@@ -84,7 +84,7 @@ export default function ChallengeList({ className = '' }: Props) {
               className={`p-4 rounded-xl border transition-all ${
                 challenge.is_completed
                   ? 'border-emerald-500/30 bg-emerald-500/10'
-                  : 'border-white/10 bg-white/5'
+                  : 'border-[var(--border)] bg-[var(--glass-bg)]'
               }`}
             >
               <div className="flex items-start justify-between mb-2">
@@ -92,11 +92,11 @@ export default function ChallengeList({ className = '' }: Props) {
                   {challenge.is_completed ? (
                     <CheckCircle className="w-5 h-5 text-emerald-400" />
                   ) : (
-                    <div className="w-5 h-5 rounded-full border-2 border-white/30" />
+                    <div className="w-5 h-5 rounded-full border-2 border-[var(--text-tertiary)]" />
                   )}
                   <span
                     className={`font-medium ${
-                      challenge.is_completed ? 'text-emerald-400' : 'text-white/90'
+                      challenge.is_completed ? 'text-emerald-400' : 'text-[var(--text-primary)]'
                     }`}
                   >
                     {challenge.title}
@@ -108,13 +108,13 @@ export default function ChallengeList({ className = '' }: Props) {
                 </div>
               </div>
 
-              <p className="text-xs text-white/50 mb-3 ml-7">
+              <p className="text-xs text-[var(--text-tertiary)] mb-3 ml-7">
                 {challenge.description}
               </p>
 
               {/* Progress bar */}
               <div className="ml-7">
-                <div className="flex justify-between text-xs text-white/40 mb-1">
+                <div className="flex justify-between text-xs text-[var(--text-tertiary)] mb-1">
                   <span>
                     {challenge.current_progress} / {challenge.target_count}
                   </span>
@@ -125,7 +125,7 @@ export default function ChallengeList({ className = '' }: Props) {
                     </span>
                   )}
                 </div>
-                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--glass-bg)] rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-500 ${
                       challenge.is_completed

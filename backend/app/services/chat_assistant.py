@@ -3,8 +3,9 @@
 所有回答通过 LLM 生成，数据库查询结果 + RAG 检索结果作为上下文。
 支持多轮对话历史。
 """
+import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime, timedelta
 from collections import defaultdict
 from openai import AsyncOpenAI
@@ -129,6 +130,74 @@ class ChatAssistant:
             logger.error(f"AI 助手生成回答失败: {e}", exc_info=True)
             # 降级到纯数据库查询回答
             return self._fallback_db_only(message)
+
+    # =====================================================
+    # 流式输出
+    # =====================================================
+
+    async def chat_stream(
+        self,
+        message: str,
+        history: Optional[List[Dict[str, str]]] = None,
+    ):
+        """
+        流式处理用户消息，逐 token yield。
+        每次 yield 一个 SSE 格式的 data chunk。
+        """
+        if not self.client:
+            yield f"data: {json.dumps({'content': '⚠️ AI 服务未配置', 'done': True}, ensure_ascii=False)}\n\n"
+            return
+
+        try:
+            import json as _json
+
+            db_context = self._gather_db_context(message)
+            rag_context = self._gather_rag_context(message)
+
+            has_history = bool(history and len(history) > 0)
+            system_prompt = self._build_system_prompt(db_context, rag_context)
+            user_prompt = self._build_user_prompt(message, db_context, rag_context, has_history=has_history)
+            messages = [{"role": "system", "content": system_prompt}]
+
+            if history:
+                for msg in history[-3:]:
+                    content = msg.get("content", "")
+                    if len(content) > 300:
+                        content = content[:300] + "..."
+                    messages.append({"role": msg.get("role", "user"), "content": content})
+
+            messages.append({"role": "user", "content": user_prompt})
+
+            from app.services.ai_client import _concurrency_limiter
+            acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(self.model, timeout=60.0)
+            if not acquired:
+                yield f"data: {_json.dumps({'content': 'AI 模型繁忙，请稍后重试', 'done': True}, ensure_ascii=False)}\n\n"
+                return
+
+            try:
+                stream = await self.client.chat.completions.create(
+                    model=actual_model,
+                    messages=messages,
+                    max_tokens=1500,
+                    temperature=0.7,
+                    stream=True,
+                )
+
+                async for chunk in stream:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        token = chunk.choices[0].delta.content
+                        yield f"data: {_json.dumps({'content': token, 'done': False}, ensure_ascii=False)}\n\n"
+
+                # 发送结束标记
+                yield f"data: {_json.dumps({'content': '', 'done': True}, ensure_ascii=False)}\n\n"
+
+            finally:
+                _concurrency_limiter.release(actual_model)
+
+        except Exception as e:
+            import json as _json
+            logger.error(f"流式回复失败: {e}")
+            yield f"data: {_json.dumps({'content': f'回复出错: {str(e)}', 'done': True}, ensure_ascii=False)}\n\n"
 
     # =====================================================
     # 上下文构建

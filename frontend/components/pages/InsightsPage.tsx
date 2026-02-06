@@ -1,12 +1,8 @@
 'use client';
 
-import AISmartSuggestions from '@/components/AISmartSuggestions';
-import HealthAlerts from '@/components/HealthAlerts';
-import PredictionCard from '@/components/PredictionCard';
-import AnomalyDetector from '@/components/AnomalyDetector';
-import WhatIfSimulator from '@/components/WhatIfSimulator';
-import KnowledgeSearch from '@/components/KnowledgeSearch';
-import AIChat from '@/components/AIChat';
+import DailyDigest from '@/components/DailyDigest';
+import DimensionDeepDive from '@/components/DimensionDeepDive';
+import OutlookSimulator from '@/components/OutlookSimulator';
 
 interface InsightsPageProps {
   refreshKey: number;
@@ -18,46 +14,24 @@ export default function InsightsPage({ refreshKey }: InsightsPageProps) {
       {/* 页面标题 */}
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">AI 洞察</h1>
-        <p className="text-sm text-[var(--text-tertiary)] mt-1">AI 驱动的个性化分析与建议</p>
+        <p className="text-sm text-[var(--text-tertiary)] mt-1">
+          AI 驱动的个性化分析与建议
+        </p>
       </div>
 
-      {/* AI 对话助手 - 新增 */}
+      {/* 模块一：今日 AI 洞察 */}
       <section className="animate-fade-in">
-        <AIChat key={`ai-chat-${refreshKey}`} />
+        <DailyDigest key={`digest-${refreshKey}`} />
       </section>
 
-      {/* AI 智能建议 */}
+      {/* 模块二：八维度深度分析 */}
       <section className="animate-fade-in delay-1">
-        <AISmartSuggestions key={`ai-suggestions-${refreshKey}`} />
+        <DimensionDeepDive key={`dimensions-${refreshKey}`} />
       </section>
 
-      {/* 健康提醒 */}
+      {/* 模块三：明日展望 + What-If 模拟 */}
       <section className="animate-fade-in delay-2">
-        <HealthAlerts key={`alerts-${refreshKey}`} />
-      </section>
-
-      {/* 预测与分析 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="animate-fade-in delay-3">
-          <PredictionCard key={`prediction-${refreshKey}`} />
-        </section>
-        <section className="animate-fade-in delay-3">
-          <AnomalyDetector key={`anomaly-${refreshKey}`} />
-        </section>
-      </div>
-
-      {/* What-If 模拟器 */}
-      <section className="animate-fade-in delay-4">
-        <WhatIfSimulator key={`whatif-${refreshKey}`} />
-      </section>
-
-      {/* 知识库搜索 - 高级搜索 */}
-      <section className="animate-fade-in delay-5 pt-4 border-t border-[var(--border)]">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">知识库搜索</h2>
-          <p className="text-xs text-[var(--text-tertiary)] mt-1">语义搜索、相似日查找</p>
-        </div>
-        <KnowledgeSearch key={`knowledge-${refreshKey}`} />
+        <OutlookSimulator key={`outlook-${refreshKey}`} />
       </section>
     </div>
   );

@@ -104,16 +104,16 @@ export default function KnowledgeSearch({ className = '' }: Props) {
 
   const getCategoryColor = (category?: string) => {
     const colors: Record<string, string> = {
-      SLEEP: 'bg-indigo-500/20 text-indigo-300',
-      DIET: 'bg-emerald-500/20 text-emerald-300',
-      ACTIVITY: 'bg-orange-500/20 text-orange-300',
-      MOOD: 'bg-pink-500/20 text-pink-300',
-      SOCIAL: 'bg-purple-500/20 text-purple-300',
-      WORK: 'bg-slate-500/20 text-slate-300',
-      GROWTH: 'bg-cyan-500/20 text-cyan-300',
-      LEISURE: 'bg-amber-500/20 text-amber-300',
+      SLEEP: 'bg-indigo-500/20 text-indigo-500 dark:text-indigo-300',
+      DIET: 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-300',
+      ACTIVITY: 'bg-orange-500/20 text-orange-500 dark:text-orange-300',
+      MOOD: 'bg-pink-500/20 text-pink-500 dark:text-pink-300',
+      SOCIAL: 'bg-purple-500/20 text-purple-500 dark:text-purple-300',
+      WORK: 'bg-slate-500/20 text-slate-500 dark:text-slate-300',
+      GROWTH: 'bg-cyan-500/20 text-cyan-500 dark:text-cyan-300',
+      LEISURE: 'bg-amber-500/20 text-amber-500 dark:text-amber-300',
     };
-    return colors[category || ''] || 'bg-white/10 text-white/50';
+    return colors[category || ''] || 'bg-[var(--glass-bg)] text-[var(--text-tertiary)]';
   };
 
   return (
@@ -122,10 +122,10 @@ export default function KnowledgeSearch({ className = '' }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white/90">个人知识库</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">个人知识库</h3>
         </div>
         {stats && (
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-[var(--text-tertiary)]">
             已索引 {stats.indexed_count} / {stats.database_count}
           </span>
         )}
@@ -137,8 +137,8 @@ export default function KnowledgeSearch({ className = '' }: Props) {
           onClick={() => setMode('ask')}
           className={`flex-1 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1 ${
             mode === 'ask'
-              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-              : 'bg-white/5 text-white/50 border border-transparent'
+              ? 'bg-purple-500/20 text-purple-500 dark:text-purple-300 border border-purple-500/30'
+              : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] border border-transparent'
           }`}
         >
           <Sparkles className="w-3 h-3" />
@@ -148,8 +148,8 @@ export default function KnowledgeSearch({ className = '' }: Props) {
           onClick={() => setMode('search')}
           className={`flex-1 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1 ${
             mode === 'search'
-              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-              : 'bg-white/5 text-white/50 border border-transparent'
+              ? 'bg-purple-500/20 text-purple-500 dark:text-purple-300 border border-purple-500/30'
+              : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] border border-transparent'
           }`}
         >
           <Search className="w-3 h-3" />
@@ -159,8 +159,8 @@ export default function KnowledgeSearch({ className = '' }: Props) {
           onClick={() => setMode('similar')}
           className={`flex-1 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1 ${
             mode === 'similar'
-              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-              : 'bg-white/5 text-white/50 border border-transparent'
+              ? 'bg-purple-500/20 text-purple-500 dark:text-purple-300 border border-purple-500/30'
+              : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] border border-transparent'
           }`}
         >
           <Calendar className="w-3 h-3" />
@@ -174,7 +174,7 @@ export default function KnowledgeSearch({ className = '' }: Props) {
           type={mode === 'similar' ? 'date' : 'text'}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder={
             mode === 'ask'
               ? '问我任何关于你生活的问题...'
@@ -182,12 +182,12 @@ export default function KnowledgeSearch({ className = '' }: Props) {
               ? '搜索关键词或描述...'
               : '选择日期查找相似的日子'
           }
-          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50"
+          className="flex-1 bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-purple-500/50"
         />
         <button
           onClick={handleSearch}
           disabled={loading || !query.trim()}
-          className="px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-xl text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 transition-all"
+          className="px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-xl text-purple-500 dark:text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 transition-all"
         >
           {loading ? '...' : <Search className="w-5 h-5" />}
         </button>
@@ -198,26 +198,26 @@ export default function KnowledgeSearch({ className = '' }: Props) {
         <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="text-sm font-medium text-purple-300">AI 回答</span>
+            <span className="text-sm font-medium text-purple-500 dark:text-purple-300">AI 回答</span>
           </div>
-          <p className="text-white/80 text-sm whitespace-pre-wrap">{answer}</p>
+          <p className="text-[var(--text-primary)] text-sm whitespace-pre-wrap">{answer}</p>
         </div>
       )}
 
       {/* Search Results */}
       {results.length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs text-white/40 mb-2">
+          <div className="text-xs text-[var(--text-tertiary)] mb-2">
             {mode === 'ask' ? '参考来源' : '搜索结果'}
           </div>
           {results.map((result, idx) => (
             <div
               key={result.id || idx}
-              className="p-3 rounded-lg bg-white/5 border border-white/10"
+              className="p-3 rounded-lg bg-[var(--glass-bg)] border border-[var(--border)]"
             >
               <div className="flex items-center gap-2 mb-1">
                 {result.metadata.date && (
-                  <span className="text-xs text-white/40">{result.metadata.date}</span>
+                  <span className="text-xs text-[var(--text-tertiary)]">{result.metadata.date}</span>
                 )}
                 {result.metadata.category && (
                   <span
@@ -228,11 +228,11 @@ export default function KnowledgeSearch({ className = '' }: Props) {
                     {result.metadata.category}
                   </span>
                 )}
-                <span className="text-xs text-white/30 ml-auto">
+                <span className="text-xs text-[var(--text-tertiary)] ml-auto">
                   相关度: {(result.relevance * 100).toFixed(0)}%
                 </span>
               </div>
-              <p className="text-sm text-white/70 line-clamp-2">
+              <p className="text-sm text-[var(--text-secondary)] line-clamp-2">
                 {result.document.slice(0, 150)}
                 {result.document.length > 150 && '...'}
               </p>
@@ -244,20 +244,20 @@ export default function KnowledgeSearch({ className = '' }: Props) {
       {/* Similar Days */}
       {similarDays.length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs text-white/40 mb-2">相似的日子</div>
+          <div className="text-xs text-[var(--text-tertiary)] mb-2">相似的日子</div>
           {similarDays.map((day, idx) => (
             <div
               key={day.date}
-              className="p-3 rounded-lg bg-white/5 border border-white/10"
+              className="p-3 rounded-lg bg-[var(--glass-bg)] border border-[var(--border)]"
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-white/80">{day.date}</span>
-                <span className="text-xs text-purple-400">
+                <span className="text-sm font-medium text-[var(--text-primary)]">{day.date}</span>
+                <span className="text-xs text-purple-500 dark:text-purple-400">
                   相似度: {(day.similarity_score * 100).toFixed(0)}%
                 </span>
               </div>
               {day.sample_content && day.sample_content.length > 0 && (
-                <p className="text-xs text-white/50 line-clamp-2">
+                <p className="text-xs text-[var(--text-tertiary)] line-clamp-2">
                   {day.sample_content.join(' | ')}
                 </p>
               )}
@@ -267,11 +267,11 @@ export default function KnowledgeSearch({ className = '' }: Props) {
       )}
 
       {/* Index button */}
-      <div className="mt-4 pt-4 border-t border-white/10">
+      <div className="mt-4 pt-4 border-t border-[var(--border)]">
         <button
           onClick={handleIndex}
           disabled={loading}
-          className="w-full py-2 text-xs text-white/40 hover:text-white/60 transition-colors"
+          className="w-full py-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
         >
           {loading ? '索引中...' : '🔄 重新索引所有记录'}
         </button>

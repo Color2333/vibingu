@@ -47,32 +47,32 @@ export default function Milestones() {
       {/* Summary Row */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+        className="w-full p-5 flex items-center justify-between hover:bg-[var(--glass-bg)] transition-colors"
       >
         <div className="flex items-center gap-6">
           {/* Streak */}
           <div className="flex items-center gap-2">
             <Flame className="w-4 h-4 text-orange-400" />
-            <span className="text-lg font-light text-white/80">{data.streak.current}</span>
-            <span className="text-xs text-white/40">天连续</span>
+            <span className="text-lg font-light text-[var(--text-primary)]">{data.streak.current}</span>
+            <span className="text-xs text-[var(--text-tertiary)]">天连续</span>
           </div>
           
           {/* Total Days */}
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-blue-400" />
-            <span className="text-lg font-light text-white/80">{data.totals.days_recorded}</span>
-            <span className="text-xs text-white/40">天记录</span>
+            <span className="text-lg font-light text-[var(--text-primary)]">{data.totals.days_recorded}</span>
+            <span className="text-xs text-[var(--text-tertiary)]">天记录</span>
           </div>
           
           {/* Achievements */}
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-amber-400" />
-            <span className="text-lg font-light text-white/80">{unlockedCount}</span>
-            <span className="text-xs text-white/40">成就</span>
+            <span className="text-lg font-light text-[var(--text-primary)]">{unlockedCount}</span>
+            <span className="text-xs text-[var(--text-tertiary)]">成就</span>
           </div>
         </div>
         
-        <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-[var(--text-tertiary)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Expanded Details */}
@@ -104,7 +104,7 @@ export default function Milestones() {
 
           {/* Achievements */}
           <div>
-            <p className="text-xs uppercase tracking-[0.15em] text-white/40 mb-3">成就</p>
+            <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-3">成就</p>
             <div className="grid grid-cols-3 gap-2">
               {data.achievements.map(achievement => (
                 <div
@@ -112,12 +112,12 @@ export default function Milestones() {
                   className={`p-3 rounded-xl text-center transition-all ${
                     achievement.unlocked
                       ? 'glass-subtle'
-                      : 'bg-white/[0.02] opacity-40'
+                      : 'bg-[var(--glass-bg)] opacity-40'
                   }`}
                   title={achievement.description}
                 >
                   <span className="text-2xl">{achievement.icon}</span>
-                  <p className="text-[10px] text-white/60 mt-1 truncate">{achievement.name}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] mt-1 truncate">{achievement.name}</p>
                 </div>
               ))}
             </div>
@@ -133,9 +133,9 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
     <div className="glass-subtle rounded-xl p-3">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="text-[10px] text-white/40 uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-lg font-light text-white/80">{value}</p>
+      <p className="text-lg font-light text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }

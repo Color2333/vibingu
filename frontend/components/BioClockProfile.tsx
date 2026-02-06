@@ -84,8 +84,8 @@ export default function BioClockProfile({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-32 bg-white/5 rounded"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-32 bg-[var(--glass-bg)] rounded"></div>
         </div>
       </div>
     );
@@ -94,8 +94,8 @@ export default function BioClockProfile({ className = '' }: Props) {
   if (!data) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-white/90 mb-4">生物钟画像</h3>
-        <p className="text-white/50 text-center py-8">暂无足够数据生成画像</p>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">生物钟画像</h3>
+        <p className="text-[var(--text-tertiary)] text-center py-8">暂无足够数据生成画像</p>
       </div>
     );
   }
@@ -104,7 +104,7 @@ export default function BioClockProfile({ className = '' }: Props) {
 
   return (
     <div className={`glass-card p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-white/90 mb-4">我的生物钟画像</h3>
+      <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">我的生物钟画像</h3>
 
       {/* Chronotype Card */}
       <div
@@ -117,8 +117,8 @@ export default function BioClockProfile({ className = '' }: Props) {
             {chronotypeIcons[chronotype.type] || '🐻'}
           </span>
           <div>
-            <h4 className="text-lg font-semibold text-white">{chronotype.name}</h4>
-            <p className="text-sm text-white/70">{chronotype.description}</p>
+            <h4 className="text-lg font-semibold text-[var(--text-primary)]">{chronotype.name}</h4>
+            <p className="text-sm text-[var(--text-secondary)]">{chronotype.description}</p>
           </div>
         </div>
       </div>
@@ -126,52 +126,52 @@ export default function BioClockProfile({ className = '' }: Props) {
       {/* Optimal Times Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         {/* Focus Work */}
-        <div className="p-3 rounded-lg bg-white/5">
+        <div className="p-3 rounded-lg bg-[var(--glass-bg)]">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-amber-400" />
-            <span className="text-xs text-white/50">最佳专注时间</span>
+            <span className="text-xs text-[var(--text-tertiary)]">最佳专注时间</span>
           </div>
-          <div className="text-lg font-semibold text-white/90">
+          <div className="text-lg font-semibold text-[var(--text-primary)]">
             {optimal_times.focus_work.label}
           </div>
           {optimal_times.focus_work.duration && (
-            <div className="text-xs text-white/40">
+            <div className="text-xs text-[var(--text-tertiary)]">
               建议持续 {optimal_times.focus_work.duration}
             </div>
           )}
         </div>
 
         {/* Exercise */}
-        <div className="p-3 rounded-lg bg-white/5">
+        <div className="p-3 rounded-lg bg-[var(--glass-bg)]">
           <div className="flex items-center gap-2 mb-2">
             <Dumbbell className="w-4 h-4 text-green-400" />
-            <span className="text-xs text-white/50">最佳运动时间</span>
+            <span className="text-xs text-[var(--text-tertiary)]">最佳运动时间</span>
           </div>
-          <div className="text-lg font-semibold text-white/90">
+          <div className="text-lg font-semibold text-[var(--text-primary)]">
             {optimal_times.exercise.label}
           </div>
         </div>
 
         {/* Sleep */}
-        <div className="p-3 rounded-lg bg-white/5">
+        <div className="p-3 rounded-lg bg-[var(--glass-bg)]">
           <div className="flex items-center gap-2 mb-2">
             <Moon className="w-4 h-4 text-indigo-400" />
-            <span className="text-xs text-white/50">理想睡眠窗口</span>
+            <span className="text-xs text-[var(--text-tertiary)]">理想睡眠窗口</span>
           </div>
-          <div className="text-sm text-white/90">
+          <div className="text-sm text-[var(--text-primary)]">
             <span className="font-semibold">{optimal_times.sleep.bedtime}</span>
-            <span className="text-white/40 mx-1">→</span>
+            <span className="text-[var(--text-tertiary)] mx-1">→</span>
             <span className="font-semibold">{optimal_times.sleep.waketime}</span>
           </div>
         </div>
 
         {/* Social */}
-        <div className="p-3 rounded-lg bg-white/5">
+        <div className="p-3 rounded-lg bg-[var(--glass-bg)]">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-purple-400" />
-            <span className="text-xs text-white/50">社交高峰期</span>
+            <span className="text-xs text-[var(--text-tertiary)]">社交高峰期</span>
           </div>
-          <div className="text-lg font-semibold text-white/90">
+          <div className="text-lg font-semibold text-[var(--text-primary)]">
             {optimal_times.social.label}
           </div>
         </div>
@@ -181,30 +181,30 @@ export default function BioClockProfile({ className = '' }: Props) {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
           <Coffee className="w-4 h-4 text-orange-400" />
-          <span className="text-sm text-white/70">理想用餐时间</span>
+          <span className="text-sm text-[var(--text-secondary)]">理想用餐时间</span>
         </div>
         <div className="flex justify-between px-2">
           <div className="text-center">
-            <div className="text-xs text-white/40">早餐</div>
-            <div className="text-sm font-medium text-white/80">
+            <div className="text-xs text-[var(--text-tertiary)]">早餐</div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">
               {optimal_times.meals.breakfast.label}
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center">
-            <div className="h-px bg-white/10 w-full mx-4"></div>
+            <div className="h-px bg-[var(--border)] w-full mx-4"></div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-white/40">午餐</div>
-            <div className="text-sm font-medium text-white/80">
+            <div className="text-xs text-[var(--text-tertiary)]">午餐</div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">
               {optimal_times.meals.lunch.label}
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center">
-            <div className="h-px bg-white/10 w-full mx-4"></div>
+            <div className="h-px bg-[var(--border)] w-full mx-4"></div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-white/40">晚餐</div>
-            <div className="text-sm font-medium text-white/80">
+            <div className="text-xs text-[var(--text-tertiary)]">晚餐</div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">
               {optimal_times.meals.dinner.label}
             </div>
           </div>
@@ -212,26 +212,26 @@ export default function BioClockProfile({ className = '' }: Props) {
       </div>
 
       {/* Weekly Pattern */}
-      <div className="p-4 rounded-lg bg-white/5 mb-6">
+      <div className="p-4 rounded-lg bg-[var(--glass-bg)] mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-xs text-white/40">最佳日</span>
+            <span className="text-xs text-[var(--text-tertiary)]">最佳日</span>
             <div className="text-sm">
-              <span className="text-emerald-400 font-medium">
+              <span className="text-emerald-500 dark:text-emerald-400 font-medium">
                 {weekly_pattern.best_day.day}
               </span>
-              <span className="text-white/50 ml-2">
+              <span className="text-[var(--text-tertiary)] ml-2">
                 {weekly_pattern.best_day.score}分
               </span>
             </div>
           </div>
           <div className="text-center">
-            <span className="text-xs text-white/40">周末提升</span>
+            <span className="text-xs text-[var(--text-tertiary)]">周末提升</span>
             <div
               className={`text-sm font-medium ${
                 weekly_pattern.weekend_boost > 0
-                  ? 'text-emerald-400'
-                  : 'text-red-400'
+                  ? 'text-emerald-500 dark:text-emerald-400'
+                  : 'text-rose-500 dark:text-rose-400'
               }`}
             >
               {weekly_pattern.weekend_boost > 0 ? '+' : ''}
@@ -239,12 +239,12 @@ export default function BioClockProfile({ className = '' }: Props) {
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xs text-white/40">需关注日</span>
+            <span className="text-xs text-[var(--text-tertiary)]">需关注日</span>
             <div className="text-sm">
-              <span className="text-red-400 font-medium">
+              <span className="text-rose-500 dark:text-rose-400 font-medium">
                 {weekly_pattern.worst_day.day}
               </span>
-              <span className="text-white/50 ml-2">
+              <span className="text-[var(--text-tertiary)] ml-2">
                 {weekly_pattern.worst_day.score}分
               </span>
             </div>
@@ -255,14 +255,14 @@ export default function BioClockProfile({ className = '' }: Props) {
       {/* Recommendations */}
       {recommendations && recommendations.length > 0 && (
         <div>
-          <h4 className="text-sm text-white/70 mb-2">个性化建议</h4>
+          <h4 className="text-sm text-[var(--text-secondary)] mb-2">个性化建议</h4>
           <ul className="space-y-2">
             {recommendations.slice(0, 3).map((rec, idx) => (
               <li
                 key={idx}
-                className="flex items-start gap-2 text-sm text-white/60"
+                className="flex items-start gap-2 text-sm text-[var(--text-secondary)]"
               >
-                <span className="text-amber-400 mt-0.5">•</span>
+                <span className="text-amber-500 dark:text-amber-400 mt-0.5">•</span>
                 {rec}
               </li>
             ))}

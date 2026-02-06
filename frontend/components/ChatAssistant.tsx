@@ -68,6 +68,10 @@ export default function ChatAssistant() {
     setInput('');
     setLoading(true);
 
+    // 先添加一个空的 assistant 消息，后续逐步填充
+    const assistantIdx = messages.length + 1; // +1 因为刚加了 userMsg
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -75,7 +79,7 @@ export default function ChatAssistant() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/chat/message', {
+      const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -84,28 +88,87 @@ export default function ChatAssistant() {
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: data.content },
-        ]);
-      } else {
+      if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        setMessages((prev) => [
-          ...prev,
-          {
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = {
             role: 'assistant',
             content: `抱歉，出了点问题 (${res.status})。${errData.detail || '请稍后再试。'}`,
-          },
-        ]);
+          };
+          return copy;
+        });
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: 'assistant', content: '流式连接失败' };
+          return copy;
+        });
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // 解析 SSE 格式：每行 "data: {...}\n\n"
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留未完成的行
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.done) break;
+            if (data.content) {
+              accumulated += data.content;
+              // 更新最后一条 assistant 消息
+              const newContent = accumulated;
+              setMessages((prev) => {
+                const copy = [...prev];
+                copy[copy.length - 1] = { role: 'assistant', content: newContent };
+                return copy;
+              });
+            }
+          } catch {
+            // 解析失败的行跳过
+          }
+        }
+      }
+
+      // 确保最终内容正确
+      if (accumulated) {
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: 'assistant', content: accumulated };
+          return copy;
+        });
+      } else {
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: 'assistant', content: 'AI 未返回内容，请重试。' };
+          return copy;
+        });
       }
     } catch (err) {
-      console.error('Chat error:', err);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: '网络错误，请检查连接后重试。' },
-      ]);
+      console.error('Chat stream error:', err);
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: 'assistant', content: '网络错误，请检查连接后重试。' };
+        return copy;
+      });
     } finally {
       setLoading(false);
     }
@@ -204,7 +267,7 @@ export default function ChatAssistant() {
                     : 'bg-[var(--glass-bg)] text-[var(--text-secondary)]'
                 }`}
               >
-                {msg.role === 'assistant' ? (
+                {msg.role === 'assistant' && msg.content ? (
                   <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
                     <ReactMarkdown
                       components={{
@@ -234,8 +297,8 @@ export default function ChatAssistant() {
             </div>
           ))}
 
-          {/* Loading indicator */}
-          {loading && (
+          {/* Loading indicator — 仅在流式还未开始输出时显示 */}
+          {loading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && (
             <div className="flex justify-start">
               <div className="bg-[var(--glass-bg)] rounded-2xl px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -244,7 +307,7 @@ export default function ChatAssistant() {
                     <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
                     <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </div>
-                  <span className="text-xs text-[var(--text-tertiary)]">AI 正在分析你的数据...</span>
+                  <span className="text-xs text-[var(--text-tertiary)]">AI 正在检索数据...</span>
                 </div>
               </div>
             </div>

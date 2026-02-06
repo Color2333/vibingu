@@ -66,8 +66,8 @@ export default function PredictionCard({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-24 bg-white/5 rounded"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-24 bg-[var(--glass-bg)] rounded"></div>
         </div>
       </div>
     );
@@ -76,8 +76,8 @@ export default function PredictionCard({ className = '' }: Props) {
   if (!data) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-white/90 mb-4">明日预测</h3>
-        <p className="text-white/50 text-center py-4">暂无足够数据进行预测</p>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">明日预测</h3>
+        <p className="text-[var(--text-tertiary)] text-center py-4">暂无足够数据进行预测</p>
       </div>
     );
   }
@@ -94,14 +94,14 @@ export default function PredictionCard({ className = '' }: Props) {
       ? 'text-emerald-400'
       : data.recent_trend.direction === 'down'
       ? 'text-red-400'
-      : 'text-white/50';
+      : 'text-[var(--text-tertiary)]';
 
   return (
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white/90">明日 Vibe 预测</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">明日 Vibe 预测</h3>
         </div>
         <span
           className={`text-xs ${
@@ -115,7 +115,7 @@ export default function PredictionCard({ className = '' }: Props) {
       {/* Main prediction */}
       <div className="flex items-center justify-center py-6">
         <div className="text-center">
-          <div className="text-xs text-white/40 mb-1">
+          <div className="text-xs text-[var(--text-tertiary)] mb-1">
             {data.historical_reference.weekday}
           </div>
           <div
@@ -129,7 +129,7 @@ export default function PredictionCard({ className = '' }: Props) {
           >
             {data.predicted_score}
           </div>
-          <div className="text-xs text-white/40 mt-1">预测分数</div>
+          <div className="text-xs text-[var(--text-tertiary)] mt-1">预测分数</div>
         </div>
       </div>
 
@@ -146,13 +146,13 @@ export default function PredictionCard({ className = '' }: Props) {
       </div>
 
       {/* Breakdown */}
-      <div className="space-y-2 pt-4 border-t border-white/10">
+      <div className="space-y-2 pt-4 border-t border-[var(--border)]">
         <div className="flex justify-between text-sm">
-          <span className="text-white/50">历史基准</span>
-          <span className="text-white/70">{data.base_score}</span>
+          <span className="text-[var(--text-tertiary)]">历史基准</span>
+          <span className="text-[var(--text-secondary)]">{data.base_score}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-white/50">趋势调整</span>
+          <span className="text-[var(--text-tertiary)]">趋势调整</span>
           <span
             className={
               data.adjustments.trend > 0 ? 'text-emerald-400' : 'text-red-400'
@@ -163,14 +163,14 @@ export default function PredictionCard({ className = '' }: Props) {
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-white/50">今日因素</span>
+          <span className="text-[var(--text-tertiary)]">今日因素</span>
           <span
             className={
               data.adjustments.today_factors > 0
                 ? 'text-emerald-400'
                 : data.adjustments.today_factors < 0
                 ? 'text-red-400'
-                : 'text-white/50'
+                : 'text-[var(--text-tertiary)]'
             }
           >
             {data.adjustments.today_factors > 0 ? '+' : ''}
@@ -181,8 +181,8 @@ export default function PredictionCard({ className = '' }: Props) {
 
       {/* Factors */}
       {data.factors && data.factors.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <div className="text-xs text-white/40 mb-2">影响因素</div>
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <div className="text-xs text-[var(--text-tertiary)] mb-2">影响因素</div>
           <div className="flex flex-wrap gap-2">
             {data.factors.map((f, idx) => (
               <span
@@ -192,7 +192,7 @@ export default function PredictionCard({ className = '' }: Props) {
                     ? 'bg-emerald-500/20 text-emerald-400'
                     : f.impact === 'negative'
                     ? 'bg-red-500/20 text-red-400'
-                    : 'bg-white/10 text-white/50'
+                    : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)]'
                 }`}
               >
                 {f.type === 'sleep'

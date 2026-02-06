@@ -20,18 +20,18 @@ interface Props {
   days?: number;
 }
 
-// Category color mapping
+// Category color mapping - theme compatible (use semantic opacity that works in both themes)
 const categoryColors: { [key: string]: string } = {
-  时间: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  身体: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  心情: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  社交: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  工作: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-  休闲: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-  饮食: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  习惯: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  成长: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  其他: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+  时间: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/25',
+  身体: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/25',
+  心情: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/25',
+  社交: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-500/25',
+  工作: 'bg-slate-500/15 text-slate-600 dark:text-slate-300 border-slate-500/25',
+  休闲: 'bg-pink-500/15 text-pink-600 dark:text-pink-300 border-pink-500/25',
+  饮食: 'bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/25',
+  习惯: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/25',
+  成长: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border-indigo-500/25',
+  其他: 'bg-gray-500/15 text-gray-600 dark:text-gray-300 border-gray-500/25',
 };
 
 export default function TagCloud({ className = '', days = 30 }: Props) {
@@ -73,12 +73,12 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
           <div className="flex flex-wrap gap-2">
             {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="h-8 bg-white/5 rounded-full"
+                className="h-8 bg-[var(--glass-bg)] rounded-full"
                 style={{ width: `${60 + Math.random() * 40}px` }}
               ></div>
             ))}
@@ -91,11 +91,11 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
   if (!data || data.tags.length === 0) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-white/90 mb-4">标签云</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">标签云</h3>
         <div className="text-center py-8">
           <span className="text-3xl">🏷️</span>
-          <p className="text-white/50 mt-2">还没有标签数据</p>
-          <p className="text-white/30 text-sm">记录更多内容来生成标签</p>
+          <p className="text-[var(--text-secondary)] mt-2">还没有标签数据</p>
+          <p className="text-[var(--text-tertiary)] text-sm">记录更多内容来生成标签</p>
         </div>
       </div>
     );
@@ -104,9 +104,9 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
   return (
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">标签云</h3>
-        <span className="text-sm text-white/50">
-          {data.total_tags} 个标签 · 最近 {data.period_days} 天
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">标签云</h3>
+        <span className="text-sm text-[var(--text-tertiary)]">
+          {data.total_tags} 个标签 · {data.period_days} 天
         </span>
       </div>
 
@@ -116,8 +116,8 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
           onClick={() => setSelectedCategory(null)}
           className={`px-3 py-1 rounded-full text-xs transition-all ${
             selectedCategory === null
-              ? 'bg-white/20 text-white'
-              : 'bg-white/5 text-white/50 hover:bg-white/10'
+              ? 'bg-[var(--text-primary)]/15 text-[var(--text-primary)]'
+              : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           全部
@@ -131,7 +131,7 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
             className={`px-3 py-1 rounded-full text-xs transition-all ${
               selectedCategory === cat
                 ? categoryColors[cat] || categoryColors['其他']
-                : 'bg-white/5 text-white/50 hover:bg-white/10'
+                : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
             }`}
           >
             {cat}
@@ -161,7 +161,7 @@ export default function TagCloud({ className = '', days = 30 }: Props) {
       </div>
 
       {filteredTags.length === 0 && (
-        <p className="text-white/50 text-center py-4">该分类暂无标签</p>
+        <p className="text-[var(--text-tertiary)] text-center py-4">该分类暂无标签</p>
       )}
     </div>
   );

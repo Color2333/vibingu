@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
 
 interface DayData {
   date: string;
@@ -30,6 +31,9 @@ export default function YearHeatmap({ className = '' }: Props) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
+  const { resolvedTheme } = useTheme();
+
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     fetchData();
@@ -51,16 +55,15 @@ export default function YearHeatmap({ className = '' }: Props) {
   };
 
   const getColor = (count: number, score: number | null) => {
-    if (count === 0) return 'bg-white/5';
+    if (count === 0) return isDark ? 'bg-white/5' : 'bg-black/[0.04]';
     
-    // Use score if available, otherwise use count
     const intensity = score !== null ? score / 100 : Math.min(count / 10, 1);
     
     if (intensity >= 0.8) return 'bg-emerald-500';
-    if (intensity >= 0.6) return 'bg-emerald-600';
-    if (intensity >= 0.4) return 'bg-emerald-700';
-    if (intensity >= 0.2) return 'bg-emerald-800';
-    return 'bg-emerald-900';
+    if (intensity >= 0.6) return 'bg-emerald-500/80';
+    if (intensity >= 0.4) return 'bg-emerald-500/55';
+    if (intensity >= 0.2) return 'bg-emerald-500/35';
+    return 'bg-emerald-500/20';
   };
 
   // Group data by weeks
@@ -91,8 +94,8 @@ export default function YearHeatmap({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-32 bg-white/5 rounded"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-32 bg-[var(--glass-bg)] rounded"></div>
         </div>
       </div>
     );
@@ -104,23 +107,23 @@ export default function YearHeatmap({ className = '' }: Props) {
     <div className={`glass-card p-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">年度活动热力图</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">年度活动热力图</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setYear(year - 1)}
-            className="p-1 rounded hover:bg-white/10 transition-colors"
+            className="p-1 rounded hover:bg-[var(--glass-bg)] transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-white/60" />
+            <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
-          <span className="text-white/80 font-medium min-w-[60px] text-center">
+          <span className="text-[var(--text-primary)] font-medium min-w-[60px] text-center">
             {year}
           </span>
           <button
             onClick={() => setYear(year + 1)}
             disabled={year >= new Date().getFullYear()}
-            className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30"
+            className="p-1 rounded hover:bg-[var(--glass-bg)] transition-colors disabled:opacity-30"
           >
-            <ChevronRight className="w-5 h-5 text-white/60" />
+            <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
         </div>
       </div>
@@ -128,21 +131,21 @@ export default function YearHeatmap({ className = '' }: Props) {
       {/* Stats */}
       <div className="flex gap-4 mb-4 text-sm">
         <div>
-          <span className="text-white/50">活跃天数</span>
-          <span className="text-white/90 ml-2 font-medium">{data?.total_days || 0}</span>
+          <span className="text-[var(--text-tertiary)]">活跃天数</span>
+          <span className="text-[var(--text-primary)] ml-2 font-medium">{data?.total_days || 0}</span>
         </div>
         <div>
-          <span className="text-white/50">总记录</span>
-          <span className="text-white/90 ml-2 font-medium">{data?.total_records || 0}</span>
+          <span className="text-[var(--text-tertiary)]">总记录</span>
+          <span className="text-[var(--text-primary)] ml-2 font-medium">{data?.total_records || 0}</span>
         </div>
       </div>
 
       {/* Month labels */}
       <div className="flex mb-1 ml-6">
-        {monthLabels.map((month, i) => (
+        {monthLabels.map((month) => (
           <div
             key={month}
-            className="text-[10px] text-white/40"
+            className="text-[10px] text-[var(--text-tertiary)]"
             style={{ width: `${100 / 12}%` }}
           >
             {month}
@@ -157,7 +160,7 @@ export default function YearHeatmap({ className = '' }: Props) {
           {weekdayLabels.map((label, i) => (
             <div
               key={i}
-              className="h-3 text-[10px] text-white/40 flex items-center"
+              className="h-3 text-[10px] text-[var(--text-tertiary)] flex items-center"
             >
               {label}
             </div>
@@ -178,7 +181,7 @@ export default function YearHeatmap({ className = '' }: Props) {
                 {week.map((day) => (
                   <div
                     key={day.date}
-                    className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-white/30 ${getColor(
+                    className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-[var(--text-tertiary)] ${getColor(
                       day.count,
                       day.avg_score
                     )}`}
@@ -194,20 +197,20 @@ export default function YearHeatmap({ className = '' }: Props) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-end gap-1 mt-4 text-xs text-white/50">
+      <div className="flex items-center justify-end gap-1 mt-4 text-xs text-[var(--text-tertiary)]">
         <span>少</span>
-        <div className="w-3 h-3 rounded-sm bg-white/5"></div>
-        <div className="w-3 h-3 rounded-sm bg-emerald-900"></div>
-        <div className="w-3 h-3 rounded-sm bg-emerald-700"></div>
+        <div className={`w-3 h-3 rounded-sm ${isDark ? 'bg-white/5' : 'bg-black/[0.04]'}`}></div>
+        <div className="w-3 h-3 rounded-sm bg-emerald-500/20"></div>
+        <div className="w-3 h-3 rounded-sm bg-emerald-500/55"></div>
         <div className="w-3 h-3 rounded-sm bg-emerald-500"></div>
         <span>多</span>
       </div>
 
       {/* Tooltip */}
       {hoveredDay && (
-        <div className="mt-4 p-3 rounded-lg bg-white/5 text-sm">
-          <div className="text-white/80 font-medium">{hoveredDay.date}</div>
-          <div className="text-white/60 mt-1">
+        <div className="mt-4 p-3 rounded-lg bg-[var(--glass-bg)] text-sm">
+          <div className="text-[var(--text-primary)] font-medium">{hoveredDay.date}</div>
+          <div className="text-[var(--text-secondary)] mt-1">
             {hoveredDay.count > 0 ? (
               <>
                 <span>{hoveredDay.count} 条记录</span>

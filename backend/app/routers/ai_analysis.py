@@ -40,6 +40,17 @@ async def get_trend_analysis(
     return await analyzer.analyze_trends(days)
 
 
+@router.get("/daily-digest")
+async def get_daily_digest():
+    """
+    获取今日 AI 综合洞察
+
+    合并了健康提醒、异常检测、智能建议为一次 LLM 调用
+    """
+    analyzer = get_ai_analyzer()
+    return await analyzer.generate_daily_digest()
+
+
 @router.get("/suggestions")
 async def get_smart_suggestions():
     """

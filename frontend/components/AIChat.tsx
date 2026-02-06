@@ -128,22 +128,22 @@ export default function AIChat({ className = '' }: Props) {
   return (
     <div className={`glass-card flex flex-col h-[500px] ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+      <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20">
             <Sparkles className="w-4 h-4 text-violet-400" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-white">AI 生活助手</h3>
-            <p className="text-[10px] text-white/40">基于你的生活数据回答问题</p>
+            <h3 className="text-sm font-medium text-[var(--text-primary)]">AI 生活助手</h3>
+            <p className="text-[10px] text-[var(--text-tertiary)]">基于你的生活数据回答问题</p>
           </div>
         </div>
         <button
           onClick={handleClear}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--glass-bg)] transition-colors"
           title="清空对话"
         >
-          <RefreshCw className="w-4 h-4 text-white/40" />
+          <RefreshCw className="w-4 h-4 text-[var(--text-tertiary)]" />
         </button>
       </div>
 
@@ -154,14 +154,14 @@ export default function AIChat({ className = '' }: Props) {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center mb-4">
               <HelpCircle className="w-6 h-6 text-violet-400" />
             </div>
-            <h4 className="text-white/80 font-medium mb-2">有什么想问的？</h4>
-            <p className="text-xs text-white/40 mb-4 max-w-xs">
+            <h4 className="text-[var(--text-primary)] font-medium mb-2">有什么想问的？</h4>
+            <p className="text-xs text-[var(--text-tertiary)] mb-4 max-w-xs">
               我可以基于你的生活记录回答问题，发现模式，给出建议
             </p>
             
             {/* 建议问题 */}
             <div className="w-full space-y-2">
-              <div className="flex items-center gap-1 text-xs text-white/40 mb-2">
+              <div className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] mb-2">
                 <Lightbulb className="w-3 h-3" />
                 试试这些问题
               </div>
@@ -169,7 +169,7 @@ export default function AIChat({ className = '' }: Props) {
                 <button
                   key={i}
                   onClick={() => handleSuggestion(q)}
-                  className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-white/70 hover:text-white/90 transition-colors"
+                  className="w-full text-left px-3 py-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--bg-secondary)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   {q}
                 </button>
@@ -193,21 +193,21 @@ export default function AIChat({ className = '' }: Props) {
               className={`max-w-[80%] ${
                 msg.role === 'user'
                   ? 'bg-violet-500/20 border border-violet-500/30 rounded-2xl rounded-br-md'
-                  : 'bg-white/5 border border-white/10 rounded-2xl rounded-bl-md'
+                  : 'bg-[var(--glass-bg)] border border-[var(--border)] rounded-2xl rounded-bl-md'
               } px-4 py-3`}
             >
               {msg.role === 'assistant' ? (
-                <div className="prose prose-invert prose-sm max-w-none">
+                <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
-                <p className="text-sm text-white/90">{msg.content}</p>
+                <p className="text-sm text-[var(--text-primary)]">{msg.content}</p>
               )}
               
               {/* 来源展示 */}
               {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/10">
-                  <div className="flex items-center gap-1 text-[10px] text-white/40 mb-2">
+                <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                  <div className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)] mb-2">
                     <ChevronDown className="w-3 h-3" />
                     参考了 {msg.sources.length} 条记录
                   </div>
@@ -215,10 +215,10 @@ export default function AIChat({ className = '' }: Props) {
                     {msg.sources.slice(0, 3).map((source, i) => (
                       <div
                         key={i}
-                        className="text-[10px] text-white/40 flex items-center gap-2"
+                        className="text-[10px] text-[var(--text-tertiary)] flex items-center gap-2"
                       >
-                        <span className="text-white/50">{source.date}</span>
-                        <span className="px-1 py-0.5 rounded bg-white/10 text-white/50">
+                        <span className="text-[var(--text-secondary)]">{source.date}</span>
+                        <span className="px-1 py-0.5 rounded bg-[var(--glass-bg)] text-[var(--text-tertiary)]">
                           {source.category}
                         </span>
                       </div>
@@ -227,7 +227,7 @@ export default function AIChat({ className = '' }: Props) {
                 </div>
               )}
               
-              <div className="mt-1 text-[10px] text-white/30">
+              <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">
                 {msg.timestamp.toLocaleTimeString('zh-CN', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -236,8 +236,8 @@ export default function AIChat({ className = '' }: Props) {
             </div>
             
             {msg.role === 'user' && (
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-white/60" />
+              <div className="w-8 h-8 rounded-lg bg-[var(--glass-bg)] flex items-center justify-center flex-shrink-0">
+                <User className="w-4 h-4 text-[var(--text-secondary)]" />
               </div>
             )}
           </div>
@@ -248,7 +248,7 @@ export default function AIChat({ className = '' }: Props) {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-violet-400 animate-pulse" />
             </div>
-            <div className="bg-white/5 border border-white/10 rounded-2xl rounded-bl-md px-4 py-3">
+            <div className="bg-[var(--glass-bg)] border border-[var(--border)] rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                 <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -262,22 +262,22 @@ export default function AIChat({ className = '' }: Props) {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-[var(--border)]">
         <div className="flex gap-2">
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="问我任何关于你生活的问题..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-violet-500/50"
+            className="flex-1 bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-violet-500/50"
             disabled={loading}
           />
           <button
             onClick={() => handleSend()}
             disabled={loading || !input.trim()}
-            className="px-4 py-2.5 bg-gradient-to-r from-violet-500/30 to-purple-500/30 border border-violet-500/30 rounded-xl text-violet-300 hover:from-violet-500/40 hover:to-purple-500/40 disabled:opacity-50 transition-all"
+            className="px-4 py-2.5 bg-gradient-to-r from-violet-500/30 to-purple-500/30 border border-violet-500/30 rounded-xl text-violet-500 dark:text-violet-300 hover:from-violet-500/40 hover:to-purple-500/40 disabled:opacity-50 transition-all"
           >
             <Send className="w-5 h-5" />
           </button>

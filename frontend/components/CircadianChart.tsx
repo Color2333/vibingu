@@ -8,6 +8,7 @@ import {
   PolarAngleAxis,
   Tooltip,
 } from 'recharts';
+import { useTheme } from '@/hooks/useTheme';
 
 interface HourlyData {
   hour: number;
@@ -41,6 +42,9 @@ export default function CircadianChart({ className = '' }: Props) {
   const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
   const [circadianData, setCircadianData] = useState<CircadianData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { resolvedTheme } = useTheme();
+
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     fetchData();
@@ -73,14 +77,19 @@ export default function CircadianChart({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
-          <div className="h-64 bg-white/5 rounded-full mx-auto w-64"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
+          <div className="h-64 bg-[var(--glass-bg)] rounded-full mx-auto w-64"></div>
         </div>
       </div>
     );
   }
 
   // Prepare data for the circular chart
+  const bgBarFill = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  const tooltipBg = isDark ? 'rgba(15,15,20,0.95)' : 'rgba(255,255,255,0.95)';
+  const tooltipBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const tooltipText = isDark ? '#fff' : '#1a1a2e';
+
   const chartData = hourlyData.map((h) => ({
     name: h.label,
     value: h.activity_level,
@@ -95,7 +104,7 @@ export default function CircadianChart({ className = '' }: Props) {
   return (
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">24小时活动节律</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">24小时活动节律</h3>
         {typeInfo && (
           <div className="flex items-center gap-2">
             <span className="text-xl">{typeInfo.icon}</span>
@@ -126,16 +135,17 @@ export default function CircadianChart({ className = '' }: Props) {
                 tick={false}
               />
               <RadialBar
-                background={{ fill: 'rgba(255,255,255,0.05)' }}
+                background={{ fill: bgBarFill }}
                 dataKey="value"
                 cornerRadius={2}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(0,0,0,0.9)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  color: 'white',
+                  backgroundColor: tooltipBg,
+                  border: `1px solid ${tooltipBorder}`,
+                  borderRadius: '10px',
+                  color: tooltipText,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                 }}
                 formatter={(value, name, props) => {
                   const item = props.payload;
@@ -156,24 +166,24 @@ export default function CircadianChart({ className = '' }: Props) {
         {/* Center info */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
-            <div className="text-3xl font-bold text-white/90">
+            <div className="text-3xl font-bold text-[var(--text-primary)]">
               {circadianData?.total_records || 0}
             </div>
-            <div className="text-xs text-white/50">总记录</div>
+            <div className="text-xs text-[var(--text-tertiary)]">总记录</div>
           </div>
         </div>
       </div>
 
       {/* Peak hours */}
       {circadianData && circadianData.peak_hours.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-white/50">活跃高峰</span>
+            <span className="text-[var(--text-tertiary)]">活跃高峰</span>
             <div className="flex gap-2">
               {circadianData.peak_hours.slice(0, 4).map((hour) => (
                 <span
                   key={hour}
-                  className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs"
+                  className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 text-xs"
                 >
                   {hour}:00
                 </span>
@@ -188,9 +198,11 @@ export default function CircadianChart({ className = '' }: Props) {
         {hourlyData.slice(0, 24).map((h) => (
           <div
             key={h.hour}
-            className="aspect-square rounded flex items-center justify-center text-[10px] transition-colors"
+            className="aspect-square rounded flex items-center justify-center text-[10px] text-[var(--text-secondary)] transition-colors"
             style={{
-              backgroundColor: `rgba(139, 92, 246, ${h.activity_level / 200 + 0.1})`,
+              backgroundColor: isDark
+                ? `rgba(139, 92, 246, ${h.activity_level / 200 + 0.1})`
+                : `rgba(139, 92, 246, ${h.activity_level / 250 + 0.08})`,
             }}
             title={`${h.label}: ${h.count}条记录`}
           >

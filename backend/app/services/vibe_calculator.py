@@ -1,41 +1,29 @@
 """
 Vibing Index 计算服务
 
-根据用户的生活数据计算每日状态指数 (0-100)
+两种计算模式：
+1. LLM 驱动（推荐）：聚合当日所有记录的 LLM dimension_scores，加权计算
+2. 规则引擎 Fallback：当 LLM 评分缺失时，使用传统的分类规则计算
 
-算法权重:
-- 睡眠质量: 40%
-- 饮食健康: 25%
-- 屏幕时间: 20%
-- 活动量: 15%
+八维度权重：
+- body: 15%  - mood: 15%  - social: 12%  - work: 13%
+- growth: 12% - meaning: 10% - digital: 11% - leisure: 12%
 """
 
+import logging
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 
 from app.models import LifeStream, DailySummary
+from app.services.dimension_analyzer import DIMENSIONS
+
+logger = logging.getLogger(__name__)
 
 
 class VibeCalculator:
-    """Vibing Index 计算器"""
-    
-    # 权重配置
-    WEIGHTS = {
-        "sleep": 0.40,
-        "diet": 0.25,
-        "screen": 0.20,
-        "activity": 0.15,
-    }
-    
-    # 理想值配置
-    IDEAL = {
-        "sleep_hours": 7.5,          # 理想睡眠时长
-        "max_caffeine_mg": 400,      # 每日最大咖啡因摄入
-        "max_screen_hours": 6,       # 每日最大屏幕时间
-        "min_activity_count": 1,     # 每日最少活动记录
-    }
+    """Vibing Index 计算器 — LLM 驱动 + 规则引擎 Fallback"""
     
     def __init__(self, db: Session):
         self.db = db
@@ -44,10 +32,8 @@ class VibeCalculator:
         """
         计算指定日期的 Vibing Index
         
-        Returns:
-            包含 vibe_score 和各项分数的字典
+        优先从 LLM 维度评分聚合，缺失时 fallback 到规则引擎
         """
-        # 获取当天所有记录
         start_time = datetime.combine(target_date, datetime.min.time())
         end_time = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
         
@@ -61,26 +47,86 @@ class VibeCalculator:
         if not records:
             return {
                 "vibe_score": None,
-                "sleep_score": None,
-                "diet_score": None,
-                "screen_score": None,
-                "activity_score": None,
+                "dimension_averages": None,
                 "insights": [],
+                "record_count": 0,
+                "scoring_mode": "none",
             }
         
-        # 分类统计
+        # 尝试 LLM 驱动模式：聚合所有记录的 dimension_scores
+        llm_scored_records = [
+            r for r in records
+            if r.dimension_scores and isinstance(r.dimension_scores, dict) and len(r.dimension_scores) >= 4
+        ]
+        
+        if llm_scored_records and len(llm_scored_records) >= len(records) * 0.5:
+            # 超过一半记录有 LLM 评分 → 使用 LLM 模式
+            return self._calculate_from_dimensions(records, llm_scored_records, target_date)
+        else:
+            # Fallback 到规则引擎
+            logger.info(f"Vibe {target_date}: LLM 评分不足({len(llm_scored_records)}/{len(records)})，使用规则引擎")
+            return self._calculate_from_rules(records, target_date)
+    
+    def _calculate_from_dimensions(
+        self,
+        all_records: List[LifeStream],
+        scored_records: List[LifeStream],
+        target_date: date,
+    ) -> Dict[str, Any]:
+        """LLM 驱动模式：从维度评分聚合计算 Vibe Score"""
+        
+        # 聚合各维度分数
+        dim_totals: Dict[str, List[float]] = {dim: [] for dim in DIMENSIONS}
+        
+        for record in scored_records:
+            for dim, score in record.dimension_scores.items():
+                if dim in dim_totals and isinstance(score, (int, float)) and score > 0:
+                    dim_totals[dim].append(float(score))
+        
+        # 各维度平均分
+        dim_averages = {}
+        for dim, dim_info in DIMENSIONS.items():
+            scores = dim_totals[dim]
+            dim_averages[dim] = round(sum(scores) / len(scores), 1) if scores else 50.0
+        
+        # 加权计算 Vibe Score
+        total_weight = sum(d["weight"] for d in DIMENSIONS.values())
+        vibe_score = sum(
+            dim_averages[dim] * DIMENSIONS[dim]["weight"]
+            for dim in DIMENSIONS
+        ) / total_weight
+        
+        # 生成洞察
+        insights = self._generate_dimension_insights(dim_averages, all_records)
+        
+        return {
+            "vibe_score": round(vibe_score),
+            "dimension_averages": dim_averages,
+            "insights": insights,
+            "record_count": len(all_records),
+            "scoring_mode": "llm",
+        }
+    
+    def _calculate_from_rules(
+        self,
+        records: List[LifeStream],
+        target_date: date,
+    ) -> Dict[str, Any]:
+        """规则引擎 Fallback：传统分类加权计算"""
+        
+        # 旧版权重
+        WEIGHTS = {"sleep": 0.40, "diet": 0.25, "screen": 0.20, "activity": 0.15}
+        
         sleep_records = [r for r in records if r.category == "SLEEP"]
         diet_records = [r for r in records if r.category == "DIET"]
         screen_records = [r for r in records if r.category == "SCREEN"]
         activity_records = [r for r in records if r.category == "ACTIVITY"]
         
-        # 计算各项分数
-        sleep_score = self._calculate_sleep_score(sleep_records)
-        diet_score = self._calculate_diet_score(diet_records)
-        screen_score = self._calculate_screen_score(screen_records)
-        activity_score = self._calculate_activity_score(activity_records)
+        sleep_score = self._rule_sleep_score(sleep_records)
+        diet_score = self._rule_diet_score(diet_records)
+        screen_score = self._rule_screen_score(screen_records)
+        activity_score = self._rule_activity_score(activity_records)
         
-        # 计算总分
         scores = {
             "sleep": sleep_score,
             "diet": diet_score,
@@ -88,172 +134,181 @@ class VibeCalculator:
             "activity": activity_score,
         }
         
-        # 只计算有数据的维度
         valid_scores = {k: v for k, v in scores.items() if v is not None}
         
         if not valid_scores:
             vibe_score = None
         else:
-            # 重新归一化权重
-            total_weight = sum(self.WEIGHTS[k] for k in valid_scores.keys())
-            vibe_score = sum(
-                v * (self.WEIGHTS[k] / total_weight) 
-                for k, v in valid_scores.items()
-            )
-            vibe_score = round(vibe_score)
+            total_weight = sum(WEIGHTS[k] for k in valid_scores)
+            vibe_score = round(sum(v * (WEIGHTS[k] / total_weight) for k, v in valid_scores.items()))
         
-        # 生成洞察
-        insights = self._generate_insights(scores, records)
+        insights = self._generate_rule_insights(scores, records)
         
         return {
             "vibe_score": vibe_score,
-            "sleep_score": sleep_score,
-            "diet_score": diet_score,
-            "screen_score": screen_score,
-            "activity_score": activity_score,
+            "dimension_averages": None,
             "insights": insights,
             "record_count": len(records),
+            "scoring_mode": "rules",
         }
     
-    def _calculate_sleep_score(self, records: List[LifeStream]) -> Optional[int]:
-        """计算睡眠分数"""
+    # ========== LLM 模式的洞察生成 ==========
+    
+    def _generate_dimension_insights(
+        self,
+        dim_averages: Dict[str, float],
+        records: List[LifeStream],
+    ) -> List[str]:
+        """基于维度分数生成洞察"""
+        insights = []
+        
+        # 找出最高和最低维度
+        sorted_dims = sorted(dim_averages.items(), key=lambda x: x[1], reverse=True)
+        best_dim = sorted_dims[0]
+        worst_dim = sorted_dims[-1]
+        
+        dim_names = {d: DIMENSIONS[d]["name"] for d in DIMENSIONS}
+        
+        if best_dim[1] >= 75:
+            insights.append(f"「{dim_names[best_dim[0]]}」维度表现出色（{best_dim[1]}分）")
+        
+        if worst_dim[1] < 40 and worst_dim[1] > 0:
+            insights.append(f"「{dim_names[worst_dim[0]]}」维度需要关注（{worst_dim[1]}分）")
+        
+        # 特定维度洞察
+        if dim_averages.get("body", 50) < 50:
+            insights.append("身体维度偏低，注意休息和运动")
+        if dim_averages.get("mood", 50) < 40:
+            insights.append("情绪状态不太好，试试做一些让自己开心的事")
+        if dim_averages.get("digital", 50) < 40:
+            insights.append("屏幕时间可能过长，记得让眼睛休息")
+        if dim_averages.get("social", 0) >= 70:
+            insights.append("社交活跃，人际关系维护得不错")
+        
+        # 记录数量提示
+        if len(records) >= 5:
+            insights.append(f"今天记录了 {len(records)} 条，生活记录习惯很好！")
+        
+        return insights[:5]  # 最多 5 条
+    
+    # ========== 规则引擎 Fallback 方法 ==========
+    
+    def _rule_sleep_score(self, records: List[LifeStream]) -> Optional[int]:
+        """规则引擎：睡眠分数"""
         if not records:
             return None
         
-        # 从 meta_data 提取睡眠时长
         total_hours = 0
-        sleep_quality_scores = []
+        quality_scores = []
         
         for r in records:
             if r.meta_data:
-                # 尝试获取睡眠时长
-                hours = r.meta_data.get("sleep_hours") or r.meta_data.get("sleep_duration")
+                hours = r.meta_data.get("sleep_hours") or r.meta_data.get("sleep_duration") or r.meta_data.get("duration_hours")
                 if hours:
-                    total_hours += float(hours)
-                
-                # 尝试获取睡眠质量分数
-                quality = r.meta_data.get("sleep_score") or r.meta_data.get("sleep_quality")
+                    try:
+                        total_hours += float(hours)
+                    except (ValueError, TypeError):
+                        pass
+                quality = r.meta_data.get("sleep_score") or r.meta_data.get("sleep_quality") or r.meta_data.get("score")
                 if quality:
-                    sleep_quality_scores.append(float(quality))
+                    try:
+                        quality_scores.append(float(quality))
+                    except (ValueError, TypeError):
+                        pass
         
-        if sleep_quality_scores:
-            # 如果有睡眠质量分数，直接使用
-            return round(sum(sleep_quality_scores) / len(sleep_quality_scores))
+        if quality_scores:
+            return round(sum(quality_scores) / len(quality_scores))
         
         if total_hours > 0:
-            # 根据睡眠时长计算分数
-            ideal = self.IDEAL["sleep_hours"]
-            if total_hours >= ideal - 0.5 and total_hours <= ideal + 1:
-                return 100
-            elif total_hours < 5:
-                return max(0, int((total_hours / 5) * 50))
-            elif total_hours < ideal - 0.5:
-                return int(50 + (total_hours - 5) / (ideal - 0.5 - 5) * 50)
-            else:  # 睡太多
-                return max(60, int(100 - (total_hours - ideal - 1) * 10))
+            if 7 <= total_hours <= 8.5:
+                return 90
+            elif 6 <= total_hours < 7:
+                return 70
+            elif total_hours < 6:
+                return max(30, int(total_hours / 6 * 60))
+            else:
+                return max(60, int(100 - (total_hours - 8.5) * 10))
         
-        # 默认给个基础分
         return 60
     
-    def _calculate_diet_score(self, records: List[LifeStream]) -> Optional[int]:
-        """计算饮食分数"""
+    def _rule_diet_score(self, records: List[LifeStream]) -> Optional[int]:
+        """规则引擎：饮食分数"""
         if not records:
             return None
         
-        total_caffeine = 0
         healthy_count = 0
         unhealthy_count = 0
         
         for r in records:
             if r.meta_data:
-                # 咖啡因摄入
-                caffeine = r.meta_data.get("caffeine_mg") or r.meta_data.get("caffeine")
-                if caffeine:
-                    total_caffeine += float(caffeine)
-                
-                # 健康饮食判断
                 is_healthy = r.meta_data.get("is_healthy")
                 if is_healthy is True:
                     healthy_count += 1
                 elif is_healthy is False:
                     unhealthy_count += 1
         
-        score = 70  # 基础分
-        
-        # 咖啡因惩罚
-        if total_caffeine > self.IDEAL["max_caffeine_mg"]:
-            score -= min(30, int((total_caffeine - self.IDEAL["max_caffeine_mg"]) / 50))
-        
-        # 健康饮食奖励
+        score = 70
         if healthy_count > unhealthy_count:
-            score += min(30, (healthy_count - unhealthy_count) * 10)
+            score += min(25, (healthy_count - unhealthy_count) * 10)
         elif unhealthy_count > healthy_count:
             score -= min(20, (unhealthy_count - healthy_count) * 10)
         
         return max(0, min(100, score))
     
-    def _calculate_screen_score(self, records: List[LifeStream]) -> Optional[int]:
-        """计算屏幕时间分数"""
+    def _rule_screen_score(self, records: List[LifeStream]) -> Optional[int]:
+        """规则引擎：屏幕时间分数"""
         if not records:
             return None
         
-        total_hours = 0
-        
+        total_minutes = 0
         for r in records:
             if r.meta_data:
-                hours = r.meta_data.get("screen_hours") or r.meta_data.get("screen_time")
-                if hours:
-                    total_hours += float(hours)
+                mins = r.meta_data.get("total_minutes") or r.meta_data.get("screen_minutes")
+                if mins:
+                    try:
+                        total_minutes += float(mins)
+                    except (ValueError, TypeError):
+                        pass
         
-        if total_hours == 0:
-            return 70  # 基础分
+        if total_minutes == 0:
+            return 70
         
-        max_hours = self.IDEAL["max_screen_hours"]
-        
-        if total_hours <= max_hours:
-            return 100 - int((total_hours / max_hours) * 30)
+        total_hours = total_minutes / 60
+        if total_hours <= 3:
+            return 90
+        elif total_hours <= 5:
+            return 70
+        elif total_hours <= 7:
+            return 50
         else:
-            return max(30, int(70 - (total_hours - max_hours) * 10))
+            return max(20, int(50 - (total_hours - 7) * 10))
     
-    def _calculate_activity_score(self, records: List[LifeStream]) -> Optional[int]:
-        """计算活动分数"""
+    def _rule_activity_score(self, records: List[LifeStream]) -> Optional[int]:
+        """规则引擎：活动分数"""
         if not records:
             return None
-        
-        activity_count = len(records)
-        min_count = self.IDEAL["min_activity_count"]
-        
-        if activity_count >= min_count:
-            return min(100, 70 + activity_count * 10)
-        else:
-            return 50
+        return min(100, 70 + len(records) * 10)
     
-    def _generate_insights(
-        self, 
-        scores: Dict[str, Optional[int]], 
-        records: List[LifeStream]
+    def _generate_rule_insights(
+        self,
+        scores: Dict[str, Optional[int]],
+        records: List[LifeStream],
     ) -> List[str]:
-        """生成 AI 洞察"""
+        """规则引擎洞察"""
         insights = []
         
-        # 睡眠洞察
         if scores.get("sleep") is not None:
             if scores["sleep"] < 60:
                 insights.append("睡眠质量偏低，建议今晚早点休息")
             elif scores["sleep"] >= 90:
                 insights.append("睡眠状态很棒，继续保持！")
         
-        # 饮食洞察
-        if scores.get("diet") is not None:
-            if scores["diet"] < 60:
-                insights.append("今天的饮食可能不太健康，注意营养均衡")
+        if scores.get("diet") is not None and scores["diet"] < 60:
+            insights.append("今天的饮食可能不太健康，注意营养均衡")
         
-        # 屏幕时间洞察
-        if scores.get("screen") is not None:
-            if scores["screen"] < 50:
-                insights.append("屏幕时间过长，记得让眼睛休息一下")
+        if scores.get("screen") is not None and scores["screen"] < 50:
+            insights.append("屏幕时间过长，记得让眼睛休息一下")
         
-        # 活动洞察
         if scores.get("activity") is None:
             insights.append("今天还没有活动记录，起来动一动吧")
         elif scores["activity"] >= 80:
@@ -261,13 +316,12 @@ class VibeCalculator:
         
         return insights
     
+    # ========== Daily Summary 更新 ==========
+    
     def update_daily_summary(self, target_date: date) -> DailySummary:
-        """
-        更新指定日期的 daily_summary
-        """
+        """更新指定日期的 daily_summary"""
         vibe_data = self.calculate_daily_vibe(target_date)
         
-        # 查找或创建记录
         summary = self.db.query(DailySummary).filter(
             DailySummary.date == target_date
         ).first()
@@ -276,10 +330,8 @@ class VibeCalculator:
             summary = DailySummary(date=target_date)
             self.db.add(summary)
         
-        # 更新数据
         summary.vibe_score = vibe_data["vibe_score"]
         
-        # 生成日记摘要
         if vibe_data["insights"]:
             summary.daily_summary_text = " | ".join(vibe_data["insights"])
         

@@ -64,11 +64,11 @@ export default function Goals() {
     <div className="glass rounded-3xl overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+        className="w-full p-5 flex items-center justify-between hover:bg-[var(--glass-bg)] transition-colors"
       >
         <div className="flex items-center gap-3">
-          <Target className="w-4 h-4 text-white/40" />
-          <span className="text-sm text-white/70">目标</span>
+          <Target className="w-4 h-4 text-[var(--text-tertiary)]" />
+          <span className="text-sm text-[var(--text-secondary)]">目标</span>
           {completedCount > 0 && (
             <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">
               <Check className="w-3 h-3" />
@@ -76,7 +76,7 @@ export default function Goals() {
             </span>
           )}
         </div>
-        <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-[var(--text-tertiary)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 
       {isExpanded && (
@@ -103,26 +103,26 @@ function GoalItem({ goal, onUpdate }: { goal: Goal; onUpdate: (target: number) =
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={goal.color}>{goal.icon}</span>
-          <span className="text-sm text-white/70">{goal.name}</span>
+          <span className="text-sm text-[var(--text-secondary)]">{goal.name}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-lg font-light ${isCompleted ? 'text-green-400' : 'text-white/70'}`}>
+          <span className={`text-lg font-light ${isCompleted ? 'text-green-400' : 'text-[var(--text-secondary)]'}`}>
             {goal.current}
           </span>
-          <span className="text-white/30">/</span>
+          <span className="text-[var(--text-tertiary)]">/</span>
           <input
             type="number"
             value={goal.target}
             onChange={(e) => onUpdate(Number(e.target.value))}
-            className="w-12 bg-transparent text-white/50 text-lg font-light text-center outline-none"
+            className="w-12 bg-transparent text-[var(--text-tertiary)] text-lg font-light text-center outline-none"
             min={1}
           />
-          <span className="text-xs text-white/30">{goal.unit}</span>
+          <span className="text-xs text-[var(--text-tertiary)]">{goal.unit}</span>
         </div>
       </div>
       
       {/* Progress Bar */}
-      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-1 bg-[var(--glass-bg)] rounded-full overflow-hidden">
         <div 
           className={`h-full transition-all duration-500 ${isCompleted ? 'bg-green-400' : 'bg-[#6366f1]'}`}
           style={{ width: `${progress}%` }}

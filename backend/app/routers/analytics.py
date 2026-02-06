@@ -20,13 +20,15 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 class VibeScoreResponse(BaseModel):
     """Vibing Index 响应"""
     date: date
-    vibe_score: Optional[int]
-    sleep_score: Optional[int]
-    diet_score: Optional[int]
-    screen_score: Optional[int]
-    activity_score: Optional[int]
-    insights: List[str]
-    record_count: int
+    vibe_score: Optional[int] = None
+    dimension_averages: Optional[dict] = None  # LLM 模式: 八维度平均分
+    sleep_score: Optional[int] = None          # 规则模式 fallback
+    diet_score: Optional[int] = None
+    screen_score: Optional[int] = None
+    activity_score: Optional[int] = None
+    insights: List[str] = []
+    record_count: int = 0
+    scoring_mode: str = "none"  # "llm" / "rules" / "none"
 
 
 class TrendDataPoint(BaseModel):
@@ -43,6 +45,18 @@ class CorrelationResult(BaseModel):
     data: dict
 
 
+def _build_vibe_response(target_date: date, vibe_data: dict) -> VibeScoreResponse:
+    """统一构建 VibeScoreResponse，兼容 LLM 和规则引擎两种模式"""
+    return VibeScoreResponse(
+        date=target_date,
+        vibe_score=vibe_data.get("vibe_score"),
+        dimension_averages=vibe_data.get("dimension_averages"),
+        insights=vibe_data.get("insights", []),
+        record_count=vibe_data.get("record_count", 0),
+        scoring_mode=vibe_data.get("scoring_mode", "none"),
+    )
+
+
 @router.get("/vibe/today", response_model=VibeScoreResponse)
 async def get_today_vibe(db: Session = Depends(get_db)):
     """获取今天的 Vibing Index"""
@@ -53,16 +67,7 @@ async def get_today_vibe(db: Session = Depends(get_db)):
     # 同时更新 daily_summary
     calculator.update_daily_summary(today)
     
-    return VibeScoreResponse(
-        date=today,
-        vibe_score=vibe_data["vibe_score"],
-        sleep_score=vibe_data["sleep_score"],
-        diet_score=vibe_data["diet_score"],
-        screen_score=vibe_data["screen_score"],
-        activity_score=vibe_data["activity_score"],
-        insights=vibe_data["insights"],
-        record_count=vibe_data["record_count"],
-    )
+    return _build_vibe_response(today, vibe_data)
 
 
 @router.get("/vibe/{date_str}", response_model=VibeScoreResponse)
@@ -87,16 +92,7 @@ async def get_vibe_score(
     # 同时更新 daily_summary
     calculator.update_daily_summary(target_date)
     
-    return VibeScoreResponse(
-        date=target_date,
-        vibe_score=vibe_data["vibe_score"],
-        sleep_score=vibe_data["sleep_score"],
-        diet_score=vibe_data["diet_score"],
-        screen_score=vibe_data["screen_score"],
-        activity_score=vibe_data["activity_score"],
-        insights=vibe_data["insights"],
-        record_count=vibe_data["record_count"],
-    )
+    return _build_vibe_response(target_date, vibe_data)
 
 
 @router.get("/trend", response_model=List[TrendDataPoint])

@@ -64,10 +64,10 @@ export default function AnomalyDetector({ className = '' }: Props) {
     return (
       <div className={`glass-card p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-white/10 rounded w-1/3 mb-4"></div>
+          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
           <div className="space-y-3">
             {[1, 2].map((i) => (
-              <div key={i} className="h-16 bg-white/5 rounded"></div>
+              <div key={i} className="h-16 bg-[var(--glass-bg)] rounded"></div>
             ))}
           </div>
         </div>
@@ -80,38 +80,38 @@ export default function AnomalyDetector({ className = '' }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-amber-400" />
-          <h3 className="text-lg font-semibold text-white/90">异常检测</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">异常检测</h3>
         </div>
         {data && (
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-[var(--text-tertiary)]">
             最近 {data.period_days} 天
           </span>
         )}
       </div>
 
       {data?.message ? (
-        <p className="text-white/50 text-center py-4">{data.message}</p>
+        <p className="text-[var(--text-tertiary)] text-center py-4">{data.message}</p>
       ) : data?.anomalies && data.anomalies.length > 0 ? (
         <div className="space-y-3">
           {data.anomalies.slice(0, 5).map((anomaly, idx) => (
             <div
               key={idx}
               className={`p-3 rounded-lg border ${
-                anomalyColors[anomaly.type] || 'border-white/10 bg-white/5'
+                anomalyColors[anomaly.type] || 'border-[var(--border)] bg-[var(--glass-bg)]'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="text-white/60 mt-0.5">
+                <div className="text-[var(--text-secondary)] mt-0.5">
                   {anomalyIcons[anomaly.type] || (
                     <AlertTriangle className="w-4 h-4" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm text-white/80">
+                  <div className="text-sm text-[var(--text-primary)]">
                     {anomaly.description}
                   </div>
                   {anomaly.date && (
-                    <div className="text-xs text-white/40 mt-1">
+                    <div className="text-xs text-[var(--text-tertiary)] mt-1">
                       {anomaly.date}
                     </div>
                   )}
@@ -130,7 +130,7 @@ export default function AnomalyDetector({ className = '' }: Props) {
                   }).map((_, i) => (
                     <div
                       key={i}
-                      className="w-2 h-2 rounded-full bg-white/10"
+                      className="w-2 h-2 rounded-full bg-[var(--glass-bg)]"
                     />
                   ))}
                 </div>
@@ -141,8 +141,8 @@ export default function AnomalyDetector({ className = '' }: Props) {
       ) : (
         <div className="text-center py-8">
           <div className="text-3xl mb-2">✨</div>
-          <p className="text-white/70">一切正常</p>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-[var(--text-secondary)]">一切正常</p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1">
             未检测到异常模式
           </p>
         </div>
@@ -150,7 +150,7 @@ export default function AnomalyDetector({ className = '' }: Props) {
 
       {data && data.anomaly_count > 5 && (
         <div className="mt-4 text-center">
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-[var(--text-tertiary)]">
             还有 {data.anomaly_count - 5} 个异常
           </span>
         </div>
