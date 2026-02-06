@@ -63,13 +63,36 @@ def run_migrations():
         logger.error(f"自动迁移失败: {e}")
 
 
+def auto_index_rag():
+    """启动时自动检查并补充 RAG 向量索引"""
+    try:
+        from app.services.rag import get_rag_service
+        rag = get_rag_service()
+        stats = rag.get_stats()
+        indexed = stats.get("indexed_count", 0)
+        total = stats.get("database_count", 0)
+        coverage = stats.get("index_coverage", 0)
+
+        if total > 0 and coverage < 95:
+            logger.info(f"RAG 索引覆盖率 {coverage}% ({indexed}/{total})，开始补充索引...")
+            result = rag.index_all_records()
+            logger.info(f"RAG 索引补充完成: 新增 {result.get('indexed', 0)} 条, 失败 {result.get('failed', 0)} 条")
+        else:
+            logger.info(f"RAG 索引状态良好: {indexed}/{total} 条 ({coverage}%)")
+    except Exception as e:
+        logger.warning(f"RAG 自动索引失败 (不影响主服务): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时创建表（开发环境）
-    if settings.debug:
-        Base.metadata.create_all(bind=engine)
-        run_migrations()  # 运行数据库迁移
+    # 启动时创建表
+    Base.metadata.create_all(bind=engine)
+    run_migrations()  # 运行数据库迁移
+
+    # 自动补充 RAG 索引
+    auto_index_rag()
+
     yield
     # 关闭时的清理工作（如需要）
 

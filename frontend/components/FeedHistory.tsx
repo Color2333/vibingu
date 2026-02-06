@@ -114,9 +114,8 @@ const TimelineCard = memo(function TimelineCard({
     
     const startPhase = (idx: number) => {
       if (idx >= analysisPhases.length) {
-        // 所有阶段完成，循环回到最后一个阶段的等待状态
-        setCurrentPhase(analysisPhases.length - 1);
-        setPhaseProgress(100);
+        // 所有阶段完成，循环重新开始
+        startPhase(0);
         return;
       }
       
