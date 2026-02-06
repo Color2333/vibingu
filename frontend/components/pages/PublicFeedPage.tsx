@@ -98,7 +98,8 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
     
     records.forEach(r => {
       categoryCount[r.category] = (categoryCount[r.category] || 0) + 1;
-      const dateKey = new Date(r.record_time || r.created_at).toISOString().split('T')[0];
+      const d = new Date(r.record_time || r.created_at);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       dates.add(dateKey);
       r.tags?.forEach(tag => {
         tagCount[tag] = (tagCount[tag] || 0) + 1;

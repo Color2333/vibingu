@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Date, Float, Integer, Text, DateTime
-from sqlalchemy.sql import func
+from datetime import datetime
 from app.database import Base
 
 
@@ -17,8 +17,8 @@ class DailySummary(Base):
     energy_level = Column(Integer, nullable=True, comment="主观能量值(1-10)")
     daily_summary_text = Column(Text, nullable=True, comment="AI生成的当天日记摘要")
     
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     def __repr__(self):
         return f"<DailySummary(date={self.date}, vibe_score={self.vibe_score})>"

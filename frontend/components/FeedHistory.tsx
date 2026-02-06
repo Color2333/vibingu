@@ -30,14 +30,23 @@ const categoryConfig: Record<string, { icon: React.ReactNode; color: string; bgC
   LEISURE: { icon: <Gamepad2 className="w-4 h-4" />, color: 'text-amber-400', bgColor: 'bg-amber-500/10', label: '休闲' },
 };
 
+/** 将日期时间字符串转为本地日期 key（YYYY-MM-DD），避免 UTC 偏移 */
+function toLocalDateKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function formatDateHeader(dateStr: string): { title: string; subtitle: string } {
-  const date = new Date(dateStr);
+  // dateStr 是 "YYYY-MM-DD" 格式，用 split 解析避免 UTC 偏移
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day); // 本地时间构造
   const now = new Date();
-  const yesterday = new Date(now);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   
-  const isToday = date.toDateString() === now.toDateString();
-  const isYesterday = date.toDateString() === yesterday.toDateString();
+  const isToday = date.getTime() === today.getTime();
+  const isYesterday = date.getTime() === yesterday.getTime();
   
   const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
   const monthDay = `${date.getMonth() + 1}月${date.getDate()}日`;
@@ -671,7 +680,7 @@ export default function FeedHistory({
     const map = new Map<string, FeedItem[]>();
     filtered.forEach(item => {
       const timeToUse = item.record_time || item.created_at;
-      const key = new Date(timeToUse).toISOString().split('T')[0];
+      const key = toLocalDateKey(timeToUse);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     });

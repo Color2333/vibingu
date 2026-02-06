@@ -1,6 +1,5 @@
 """Token 用量记录模型"""
 from sqlalchemy import Column, String, Integer, Float, DateTime, Enum as SQLEnum
-from sqlalchemy.sql import func
 from datetime import datetime
 import enum
 
@@ -41,7 +40,7 @@ class TokenUsage(Base):
     __tablename__ = "token_usage"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
     
     # 模型信息
     model = Column(String(50), nullable=False)  # 使用的模型

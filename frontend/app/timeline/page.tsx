@@ -169,7 +169,9 @@ export default function TimelinePage() {
 
 function DayCard({ day, getScoreClass }: { day: DayData; getScoreClass: (score: number | null) => string }) {
   const date = new Date(day.date);
-  const isToday = day.date === new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isToday = day.date === todayKey;
 
   return (
     <div className={`glass rounded-2xl p-4 ${isToday ? 'glow-border' : ''}`}>

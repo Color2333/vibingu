@@ -3,7 +3,6 @@
 等级、经验值、徽章、挑战
 """
 from sqlalchemy import Column, String, Integer, Float, DateTime, Boolean, Enum, Text
-from sqlalchemy.sql import func
 from datetime import datetime
 import enum
 
@@ -60,8 +59,8 @@ class UserLevel(Base):
     last_record_date = Column(DateTime, nullable=True)
     
     # 时间戳
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class UserBadge(Base):
@@ -72,7 +71,7 @@ class UserBadge(Base):
     user_id = Column(String(36), nullable=True)
     
     badge_type = Column(String(50), nullable=False)
-    earned_at = Column(DateTime, server_default=func.now())
+    earned_at = Column(DateTime, default=datetime.now)
     
     # 徽章详情
     title = Column(String(100))
@@ -107,7 +106,7 @@ class Challenge(Base):
     
     # 状态
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, default=datetime.now)
 
 
 class UserChallengeProgress(Base):
@@ -124,8 +123,8 @@ class UserChallengeProgress(Base):
     completed_at = Column(DateTime, nullable=True)
     
     # 时间戳
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 # ========== 等级配置 ==========

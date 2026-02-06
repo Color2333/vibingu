@@ -1,8 +1,8 @@
 import uuid
 import enum
 import json
+from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, Enum, TypeDecorator, Boolean, Index
-from sqlalchemy.sql import func
 from app.database import Base
 
 
@@ -71,7 +71,7 @@ class LifeStream(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="唯一标识")
     user_id = Column(String(36), nullable=True, comment="用户ID(为未来多用户预留)")
-    created_at = Column(DateTime, server_default=func.now(), comment="提交时间")
+    created_at = Column(DateTime, default=datetime.now, comment="提交时间（本地时间）")
     record_time = Column(DateTime, nullable=True, comment="实际发生时间（AI分析得出）")
     input_type = Column(String(20), nullable=False, comment="输入类型")
     category = Column(String(20), nullable=True, comment="分类")

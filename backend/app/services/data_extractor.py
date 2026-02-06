@@ -101,8 +101,17 @@ class DataExtractor:
         else:
             return "深夜"
     
+    def _to_naive_beijing(self, dt: datetime) -> datetime:
+        """将任意 datetime 转为无时区的北京时间（供 SQLite 存储）"""
+        if dt.tzinfo is not None:
+            # 先转为北京时间，再去掉时区信息
+            dt = dt.astimezone(DEFAULT_TIMEZONE)
+            return dt.replace(tzinfo=None)
+        # 已经是 naive datetime，假设就是北京时间
+        return dt
+    
     def _parse_record_time(self, record_time_str: Optional[str], client_time: Optional[str]) -> Optional[datetime]:
-        """解析 AI 返回的记录时间"""
+        """解析 AI 返回的记录时间，返回无时区的北京时间 naive datetime"""
         if not record_time_str:
             return None
         
@@ -114,34 +123,37 @@ class DataExtractor:
                 # 可能是完整日期时间
                 if len(record_time_str) == 10:  # "2026-02-04"
                     dt = datetime.strptime(record_time_str, "%Y-%m-%d")
-                    return dt.replace(hour=12, tzinfo=DEFAULT_TIMEZONE)  # 默认中午
+                    return dt.replace(hour=12)  # 默认中午，naive 北京时间
                 else:
                     dt = datetime.fromisoformat(record_time_str.replace('Z', '+00:00'))
                     if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=DEFAULT_TIMEZONE)
-                    return dt
+                        # 无时区信息，假设是北京时间
+                        return dt
+                    # 有时区信息，转为北京时间再去掉时区
+                    return self._to_naive_beijing(dt)
             
-            # 尝试解析相对时间
+            # 尝试解析相对时间（基于 client_dt，先转为 naive 北京时间）
+            naive_client = self._to_naive_beijing(client_dt)
             record_time_str = record_time_str.lower().strip()
             
             if record_time_str in ['今天', 'today', '现在', 'now']:
-                return client_dt
+                return naive_client
             elif record_time_str in ['昨天', 'yesterday', '昨晚', '昨天晚上']:
-                return client_dt - timedelta(days=1)
+                return naive_client - timedelta(days=1)
             elif record_time_str in ['前天', '大前天']:
                 days = 2 if '大' not in record_time_str else 3
-                return client_dt - timedelta(days=days)
+                return naive_client - timedelta(days=days)
             elif '天前' in record_time_str or 'days ago' in record_time_str:
                 # 解析 "2天前" 或 "2 days ago"
                 match = re.search(r'(\d+)', record_time_str)
                 if match:
                     days = int(match.group(1))
-                    return client_dt - timedelta(days=days)
+                    return naive_client - timedelta(days=days)
             
             # 尝试解析 "昨晚 23:30" 格式
             if '昨' in record_time_str:
                 time_match = re.search(r'(\d{1,2}):(\d{2})', record_time_str)
-                yesterday = client_dt - timedelta(days=1)
+                yesterday = naive_client - timedelta(days=1)
                 if time_match:
                     hour, minute = int(time_match.group(1)), int(time_match.group(2))
                     return yesterday.replace(hour=hour, minute=minute)
