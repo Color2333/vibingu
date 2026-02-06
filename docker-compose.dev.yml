@@ -37,7 +37,7 @@ services:
     container_name: vibingu-frontend-dev
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - INTERNAL_API_URL=http://backend:8000
       - WATCHPACK_POLLING=true
     volumes:
       - ./frontend:/app

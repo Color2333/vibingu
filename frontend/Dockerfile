@@ -28,9 +28,9 @@ RUN npm config set registry https://registry.npmmirror.com
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Accept build argument for API URL
-ARG NEXT_PUBLIC_API_URL=http://backend:8000
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Accept build argument for internal API URL (server-side rewrites only)
+ARG INTERNAL_API_URL=http://backend:8000
+ENV INTERNAL_API_URL=${INTERNAL_API_URL}
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1

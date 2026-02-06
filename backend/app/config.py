@@ -53,6 +53,14 @@ class Settings(BaseSettings):
             return self.zhipu_base_url
         return self.openai_base_url
     
+    # 认证密码（ADMIN_PASSWORD 或 AUTH_PASSWORD 均可）
+    admin_password: str = ""
+    auth_password: str = ""
+    
+    def get_auth_password(self) -> str:
+        """获取管理员密码，优先 ADMIN_PASSWORD，其次 AUTH_PASSWORD"""
+        return self.admin_password or self.auth_password or ""
+    
     # Server
     debug: bool = True
     

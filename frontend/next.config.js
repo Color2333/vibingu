@@ -35,8 +35,9 @@ const nextConfig = {
   },
 
   async rewrites() {
-    // Use environment variable for API URL, fallback to localhost for development
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    // 服务端代理：使用 INTERNAL_API_URL（不暴露到客户端）
+    // Docker 内部用 http://backend:8000，本地开发 fallback 到 localhost
+    const apiUrl = process.env.INTERNAL_API_URL || 'http://localhost:8000';
     return [
       {
         source: '/api/:path*',

@@ -5,10 +5,11 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
-import os
 import secrets
 import time
 import logging
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _token_store: dict[str, float] = {}
 
 # Token 有效期（秒），默认 7 天
-TOKEN_EXPIRE_SECONDS = int(os.getenv("TOKEN_EXPIRE_SECONDS", str(7 * 24 * 3600)))
+settings = get_settings()
+TOKEN_EXPIRE_SECONDS = int(7 * 24 * 3600)
 
 
 def _cleanup_expired():
@@ -65,10 +67,10 @@ class VerifyRequest(BaseModel):
 
 
 def _get_admin_password() -> str:
-    """获取管理员密码，未配置时使用安全提示"""
-    password = os.getenv("ADMIN_PASSWORD") or os.getenv("AUTH_PASSWORD")
+    """获取管理员密码，通过 Settings 统一读取（支持环境变量 + .env 文件）"""
+    password = settings.get_auth_password()
     if not password:
-        logger.warning("⚠️ ADMIN_PASSWORD 未设置，使用默认密码 'changeme'。请立即通过环境变量配置！")
+        logger.warning("⚠️ AUTH_PASSWORD 未设置，使用默认密码 'changeme'。请在 .env 文件或环境变量中配置 AUTH_PASSWORD！")
         return "changeme"
     return password
 
