@@ -556,25 +556,17 @@ class DataExtractor:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                max_tokens=1500,
+                max_tokens=6000,
             )
             
-            # 提取 JSON（AI 可能返回额外文本）
+            # 提取 JSON（AI 可能返回 markdown 代码块、额外文本、或截断内容）
             raw_content = response.choices[0].message.content
             if not raw_content or not raw_content.strip():
                 logger.warning(f"AI 返回空内容 (model={actual_model}, category={category})")
                 raise ValueError("AI 返回内容为空")
             
-            content = raw_content.strip()
-            start_idx = content.find('{')
-            end_idx = content.rfind('}')
-            
-            if start_idx != -1 and end_idx != -1:
-                json_str = content[start_idx:end_idx + 1]
-                result = json.loads(json_str)
-            else:
-                logger.warning(f"AI 返回内容不含 JSON (model={actual_model}): {content[:200]}")
-                raise ValueError(f"AI 返回内容无法解析为 JSON: {content[:100]}")
+            from app.services.json_utils import extract_json
+            result = extract_json(raw_content, actual_model)
             
             # 提取 dimension_scores（LLM 驱动评分）
             dimension_scores = result.pop("dimension_scores", None)

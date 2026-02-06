@@ -278,7 +278,7 @@ class AIClient:
         self,
         messages: List[Dict[str, str]],
         model: str = None,
-        max_tokens: int = 2000,
+        max_tokens: int = 4000,
         temperature: float = 0.7,
         task_type: str = "chat",
         task_description: str = None,
@@ -360,7 +360,7 @@ class AIClient:
         prompt: str,
         image_base64: str,
         model: str = None,
-        max_tokens: int = 2000,
+        max_tokens: int = 4000,
         task_type: str = "vision",
         task_description: str = None,
         record_id: str = None,
@@ -494,33 +494,14 @@ class AIClient:
         return response.data[0].embedding
     
     def _extract_json(self, content: str) -> Any:
-        """从内容中提取 JSON"""
+        """从内容中提取 JSON（使用共享的健壮解析器）"""
         if not content:
             return None
         
-        # 尝试直接解析
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-        
-        # 尝试从 markdown 代码块提取
-        if "```json" in content:
-            try:
-                json_str = content.split("```json")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            except (IndexError, json.JSONDecodeError):
-                pass
-        
-        if "```" in content:
-            try:
-                json_str = content.split("```")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            except (IndexError, json.JSONDecodeError):
-                pass
-        
-        # 返回原始内容
-        return content
+        from app.services.json_utils import safe_extract_json
+        result = safe_extract_json(content, model_name="ai_client", fallback=None)
+        # 如果解析失败，返回原始内容（保持向后兼容）
+        return result if result is not None else content
 
 
 # 全局单例

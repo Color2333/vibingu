@@ -365,7 +365,7 @@ class RAGService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=500,
+                max_tokens=2000,
                 temperature=0.7
             )
             
@@ -495,7 +495,7 @@ class RAGService:
             response = self.openai_client.chat.completions.create(
                 model=self.smart_model,
                 messages=messages,
-                max_tokens=800,
+                max_tokens=3000,
                 temperature=0.7
             )
             
@@ -575,7 +575,7 @@ class RAGService:
                     {"role": "system", "content": "你是一个善于总结和分析的生活数据助手。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=400,
+                max_tokens=2000,
                 temperature=0.7
             )
             
@@ -649,7 +649,7 @@ class RAGService:
                     {"role": "system", "content": "你是一个关心用户健康和生活质量的智能助手。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=2000,
                 temperature=0.7
             )
             

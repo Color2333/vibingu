@@ -51,8 +51,9 @@ export default function TimelinePage() {
         const dayMap: Record<string, DayData> = {};
         
         for (const record of records) {
-          const dateStr = record.created_at.split('T')[0];
-          const recordDate = new Date(dateStr);
+          const d = new Date(record.created_at);
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const recordDate = d;
           
           if (recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month) {
             if (!dayMap[dateStr]) {

@@ -59,7 +59,14 @@ htmlcov/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite3
+
+# ChromaDB data
+chroma_db/
+backend/chroma_db/
 
 # Uploads
 uploads/

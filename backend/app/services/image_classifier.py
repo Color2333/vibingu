@@ -137,21 +137,13 @@ class ImageClassifier:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                max_tokens=500,
+                max_tokens=1600,
             )
             
-            # 提取 JSON（AI 可能返回额外文本）
-            content = response.choices[0].message.content.strip()
-            
-            # 尝试找到 JSON 对象
-            start_idx = content.find('{')
-            end_idx = content.rfind('}')
-            
-            if start_idx != -1 and end_idx != -1:
-                json_str = content[start_idx:end_idx + 1]
-                result = json.loads(json_str)
-            else:
-                result = json.loads(content)
+            # 提取 JSON（AI 可能返回 markdown 代码块或额外文本）
+            content = response.choices[0].message.content
+            from app.services.json_utils import extract_json
+            result = extract_json(content, actual_model)
             
             return {
                 "image_type": result.get("image_type", "other"),

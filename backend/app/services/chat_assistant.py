@@ -107,7 +107,7 @@ class ChatAssistant:
                 response = await self.client.chat.completions.create(
                     model=actual_model,
                     messages=messages,
-                    max_tokens=1500,
+                    max_tokens=4000,
                     temperature=0.7,
                 )
             finally:
@@ -178,7 +178,7 @@ class ChatAssistant:
                 stream = await self.client.chat.completions.create(
                     model=actual_model,
                     messages=messages,
-                    max_tokens=1500,
+                    max_tokens=4000,
                     temperature=0.7,
                     stream=True,
                 )

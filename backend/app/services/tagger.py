@@ -164,7 +164,7 @@ class TaggerAgent:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                max_tokens=300,
+                max_tokens=1000,
                 task_type="generate_tags",
                 task_description=f"Tags for: {category}",
                 record_id=record_id,

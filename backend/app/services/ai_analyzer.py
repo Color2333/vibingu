@@ -3,7 +3,6 @@ AI 分析器 - 基于历史数据生成深度洞察
 """
 
 import json
-import asyncio
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -13,6 +12,7 @@ from collections import defaultdict
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models import LifeStream
+from app.services.json_utils import safe_extract_json
 from app.services.ai_client import get_ai_client, AIClientError
 
 logger = logging.getLogger(__name__)
@@ -224,7 +224,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "生成今日洞察报告，只输出JSON。"}
                 ],
-                max_tokens=1500,
+                max_tokens=6000,
                 task_type="daily_digest",
                 task_description="今日 AI 洞察",
                 json_response=True,
@@ -238,12 +238,11 @@ class AIAnalyzer:
                 content["has_data"] = True
                 return content
 
-            try:
-                parsed = json.loads(content)
+            parsed = safe_extract_json(content, "daily_digest")
+            if parsed and isinstance(parsed, dict):
                 parsed["has_data"] = True
                 return parsed
-            except json.JSONDecodeError:
-                return self._mock_daily_digest(today, week)
+            return self._mock_daily_digest(today, week)
 
         except Exception as e:
             logger.error(f"Daily digest 生成错误: {e}")
@@ -432,7 +431,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "请分析我的数据，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=3000,
+                max_tokens=6000,
                 task_type="weekly_analysis",
                 task_description="AI 周度分析",
                 json_response=True,
@@ -449,12 +448,11 @@ class AIAnalyzer:
                 return content
             
             # 如果返回的是字符串，尝试解析
-            try:
-                parsed = json.loads(content)
+            parsed = safe_extract_json(content, "weekly_analysis")
+            if parsed and isinstance(parsed, dict):
                 parsed["has_data"] = True
                 return parsed
-            except json.JSONDecodeError:
-                return self._mock_analysis(data)
+            return self._mock_analysis(data)
                 
         except AIClientError as e:
             logger.error(f"AI 分析错误: {e}")
@@ -498,7 +496,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "分析趋势，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=2500,
+                max_tokens=5000,
                 task_type="trend_analysis",
                 task_description="AI 趋势分析",
                 json_response=True,
@@ -513,13 +511,12 @@ class AIAnalyzer:
                 content["period_days"] = days
                 return content
             
-            try:
-                parsed = json.loads(content)
+            parsed = safe_extract_json(content, "trend_analysis")
+            if parsed and isinstance(parsed, dict):
                 parsed["has_data"] = True
                 parsed["period_days"] = days
                 return parsed
-            except json.JSONDecodeError:
-                return self._mock_trend_analysis(data)
+            return self._mock_trend_analysis(data)
                 
         except Exception as e:
             logger.error(f"AI 趋势分析错误: {e}")
@@ -560,7 +557,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "给我一些建议，只输出JSON，不要其他内容。"}
                 ],
-                max_tokens=2500,
+                max_tokens=5000,
                 task_type="smart_suggestions",
                 task_description="AI 智能建议",
                 json_response=True,
@@ -573,10 +570,10 @@ class AIAnalyzer:
             if isinstance(content, dict):
                 return content
             
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return self._mock_suggestions(data)
+            parsed = safe_extract_json(content, "suggestions")
+            if parsed and isinstance(parsed, dict):
+                return parsed
+            return self._mock_suggestions(data)
                 
         except Exception as e:
             logger.error(f"AI 建议生成错误: {e}")
@@ -612,7 +609,7 @@ class AIAnalyzer:
                     {"role": "user", "content": f"{question}\n\n只输出JSON格式，不要其他内容。"}
                 ],
                 model=settings.smart_model,  # 深度洞察使用高级模型
-                max_tokens=2000,
+                max_tokens=6000,
                 task_type="deep_insight",
                 task_description="AI 深度洞察",
                 json_response=True,
@@ -625,10 +622,10 @@ class AIAnalyzer:
             if isinstance(content, dict):
                 return content
             
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return {"answer": content, "confidence": "low"}
+            parsed = safe_extract_json(content, "deep_insight")
+            if parsed and isinstance(parsed, dict):
+                return parsed
+            return {"answer": content, "confidence": "low"}
                 
         except Exception as e:
             logger.error(f"AI 深度洞察错误: {e}")

@@ -57,6 +57,9 @@ ENV TZ=Asia/Shanghai
 # Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Internal API URL for server-side rewrites (baked at build, kept for runtime compatibility)
+ARG INTERNAL_API_URL=http://backend:8000
+ENV INTERNAL_API_URL=${INTERNAL_API_URL}
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs

@@ -17,7 +17,6 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta, time
 from collections import defaultdict
-import math
 import json
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -732,7 +731,7 @@ class TimeIntelligence:
                     {"role": "system", "content": "你是一个专业的时间管理和生物钟分析专家。基于用户的实际数据提供个性化建议。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1500,
+                max_tokens=5000,
                 task_type="time_analysis",
                 task_description="AI 时间智能分析",
                 json_response=True,
