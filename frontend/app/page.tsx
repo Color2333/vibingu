@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Sidebar, { PageId } from '@/components/Sidebar';
 import RecordPage from '@/components/pages/RecordPage';
 import AnalyticsPage from '@/components/pages/AnalyticsPage';
@@ -13,6 +13,9 @@ import PublicFeedPage from '@/components/pages/PublicFeedPage';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
 
+// 需要保持状态的页面（切换后不卸载）
+const KEEP_ALIVE_PAGES: PageId[] = ['record', 'chat'];
+
 export default function Home() {
   const [currentPage, setCurrentPage] = useState<PageId>('record');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -20,11 +23,14 @@ export default function Home() {
   const { showToast } = useToast();
   const { isAuthenticated, isLoading: authLoading, login, logout } = useAuth();
 
+  // 记录已经挂载过的页面（keep-alive 用）
+  const mountedPages = useRef<Set<PageId>>(new Set(['record']));
+
   const handlePageChange = useCallback((page: PageId) => {
     setCurrentPage(page);
-    // 只在切换到非 record 页面时刷新该页面数据
-    // record 页面保持状态，不刷新（避免丢失正在分析的临时记录）
-    if (page !== 'record') {
+    mountedPages.current.add(page);
+    // 非 keep-alive 页面切换时刷新数据
+    if (!KEEP_ALIVE_PAGES.includes(page)) {
       setRefreshKey(k => k + 1);
     }
   }, []);
@@ -63,24 +69,11 @@ export default function Home() {
     return <PublicFeedPage onEnterPrivate={() => setShowLogin(true)} />;
   }
 
-  // 渲染当前页面
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'record':
-        return <RecordPage refreshKey={refreshKey} />;
-      case 'analytics':
-        return <AnalyticsPage refreshKey={refreshKey} />;
-      case 'insights':
-        return <InsightsPage refreshKey={refreshKey} />;
-      case 'achievements':
-        return <AchievementsPage refreshKey={refreshKey} />;
-      case 'chat':
-        return <ChatPage />;
-      case 'settings':
-        return <SettingsPage />;
-      default:
-        return <RecordPage refreshKey={refreshKey} />;
-    }
+  // 判断一个页面是否应该保持在 DOM 中
+  const shouldMount = (page: PageId) => {
+    if (page === currentPage) return true;
+    // keep-alive 页面：只要曾经挂载过就保留
+    return KEEP_ALIVE_PAGES.includes(page) && mountedPages.current.has(page);
   };
 
   return (
@@ -95,22 +88,22 @@ export default function Home() {
       {/* 主内容区域 */}
       <main className="md:ml-[72px] min-h-screen">
         <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl pt-16 md:pt-8">
-          {renderPage()}
+          {/* Keep-alive 页面：用 display 控制显隐，不卸载 */}
+          <div style={{ display: currentPage === 'record' ? 'block' : 'none' }}>
+            {shouldMount('record') && <RecordPage refreshKey={refreshKey} />}
+          </div>
+
+          <div style={{ display: currentPage === 'chat' ? 'block' : 'none' }}>
+            {shouldMount('chat') && <ChatPage />}
+          </div>
+
+          {/* 非 keep-alive 页面：正常 switch 渲染 */}
+          {currentPage === 'analytics' && <AnalyticsPage refreshKey={refreshKey} />}
+          {currentPage === 'insights' && <InsightsPage refreshKey={refreshKey} />}
+          {currentPage === 'achievements' && <AchievementsPage refreshKey={refreshKey} />}
+          {currentPage === 'settings' && <SettingsPage />}
         </div>
       </main>
-
-      {/* AI 对话 - 快捷浮动入口（非 chat 页面才显示） */}
-      {currentPage !== 'chat' && (
-        <button
-          onClick={() => setCurrentPage('chat')}
-          className="fixed bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-gradient-to-r from-purple-500/80 to-cyan-500/80 shadow-lg flex items-center justify-center hover:scale-110 transition-all"
-          aria-label="打开 AI 对话"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-white">
-            <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }
