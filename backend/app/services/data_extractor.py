@@ -548,7 +548,12 @@ class DataExtractor:
             )
             
             # 提取 JSON（AI 可能返回额外文本）
-            content = response.choices[0].message.content.strip()
+            raw_content = response.choices[0].message.content
+            if not raw_content or not raw_content.strip():
+                logger.warning(f"AI 返回空内容 (model={actual_model}, category={category})")
+                raise ValueError("AI 返回内容为空")
+            
+            content = raw_content.strip()
             start_idx = content.find('{')
             end_idx = content.rfind('}')
             
@@ -556,7 +561,8 @@ class DataExtractor:
                 json_str = content[start_idx:end_idx + 1]
                 result = json.loads(json_str)
             else:
-                result = json.loads(content)
+                logger.warning(f"AI 返回内容不含 JSON (model={actual_model}): {content[:200]}")
+                raise ValueError(f"AI 返回内容无法解析为 JSON: {content[:100]}")
             
             # 提取 dimension_scores（LLM 驱动评分）
             dimension_scores = result.pop("dimension_scores", None)

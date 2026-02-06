@@ -47,6 +47,13 @@ WORKDIR /app
 # Configure Alpine apk to use Chinese mirror
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
+# Set timezone to Asia/Shanghai (Beijing time)
+RUN apk add --no-cache tzdata \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && apk del tzdata
+ENV TZ=Asia/Shanghai
+
 # Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -59,6 +66,9 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Create cache directory and set ownership for nextjs user
+RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next
 
 # Set correct permissions
 USER nextjs
