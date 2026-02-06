@@ -25,7 +25,7 @@ export default function InsightsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen gradient-mesh flex items-center justify-center">
-        <div className="text-white/30 animate-pulse">Loading...</div>
+        <div className="text-[var(--text-tertiary)] animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -41,13 +41,14 @@ export default function InsightsPage() {
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/"
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--bg-secondary)] transition-colors"
+            aria-label="返回首页"
           >
-            <ArrowLeft className="w-5 h-5 text-white/60" />
+            <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)]" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white/90">时间智能洞察</h1>
-            <p className="text-sm text-white/50">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">时间智能洞察</h1>
+            <p className="text-sm text-[var(--text-tertiary)]">
               深入了解你的生活节律与模式
             </p>
           </div>
@@ -57,19 +58,19 @@ export default function InsightsPage() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           <div className="glass-card p-4 text-center">
             <Clock className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-            <div className="text-xs text-white/50">昼夜节律</div>
+            <div className="text-xs text-[var(--text-tertiary)]">昼夜节律</div>
           </div>
           <div className="glass-card p-4 text-center">
             <Calendar className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-            <div className="text-xs text-white/50">周期分析</div>
+            <div className="text-xs text-[var(--text-tertiary)]">周期分析</div>
           </div>
           <div className="glass-card p-4 text-center">
             <Activity className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-            <div className="text-xs text-white/50">活动热力</div>
+            <div className="text-xs text-[var(--text-tertiary)]">活动热力</div>
           </div>
           <div className="glass-card p-4 text-center">
             <Brain className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
-            <div className="text-xs text-white/50">AI 洞察</div>
+            <div className="text-xs text-[var(--text-tertiary)]">AI 洞察</div>
           </div>
         </div>
 
@@ -114,8 +115,8 @@ export default function InsightsPage() {
         </section>
 
         {/* AI 预测与分析 */}
-        <section className="mt-8 pt-8 border-t border-white/10">
-          <h2 className="text-xl font-semibold text-white/90 mb-4 flex items-center gap-2">
+        <section className="mt-8 pt-8 border-t border-[var(--border)]">
+          <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
             <span className="text-2xl">🤖</span>
             AI 预测与分析
           </h2>
@@ -127,8 +128,8 @@ export default function InsightsPage() {
         </section>
 
         {/* 个人知识库 RAG */}
-        <section className="mt-8 pt-8 border-t border-white/10">
-          <h2 className="text-xl font-semibold text-white/90 mb-4 flex items-center gap-2">
+        <section className="mt-8 pt-8 border-t border-[var(--border)]">
+          <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
             <span className="text-2xl">🧠</span>
             个人知识库
           </h2>

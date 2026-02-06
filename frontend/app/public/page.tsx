@@ -57,7 +57,7 @@ export default function PublicPage() {
   }, []);
 
   const getScoreClass = (score: number | null) => {
-    if (score === null) return 'text-white/30';
+    if (score === null) return 'text-[var(--text-tertiary)]';
     if (score >= 80) return 'text-emerald-400';
     if (score >= 60) return 'text-blue-400';
     if (score >= 40) return 'text-amber-400';
@@ -66,8 +66,8 @@ export default function PublicPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="text-white/30 animate-pulse">Loading...</div>
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-[var(--text-tertiary)] animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -79,18 +79,18 @@ export default function PublicPage() {
       <div className="container mx-auto px-4 py-8 max-w-lg">
         {/* Header */}
         <header className="flex items-center justify-between mb-12">
-          <Link href="/" className="p-2 text-white/30 hover:text-white/50 transition-colors">
+          <Link href="/" className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors" aria-label="返回首页">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="text-center">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-white/30">Live</p>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--text-tertiary)]">Live</p>
           </div>
           <div className="w-9" />
         </header>
 
         {/* Main Score */}
         <section className="text-center mb-12">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/30 mb-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">
             Hao&apos;s Vibe
           </p>
           <div className="relative inline-block">
@@ -101,7 +101,7 @@ export default function PublicPage() {
               <div className="absolute -inset-8 bg-current opacity-10 blur-[60px] rounded-full -z-10" />
             )}
           </div>
-          <p className="mt-4 text-sm text-white/40">
+          <p className="mt-4 text-sm text-[var(--text-tertiary)]">
             {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
         </section>
@@ -118,30 +118,30 @@ export default function PublicPage() {
 
         {/* Trend */}
         <section className="glass rounded-3xl p-6 mb-6">
-          <p className="text-xs uppercase tracking-[0.15em] text-white/30 mb-4">14 Day Trend</p>
+          <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-4">14 Day Trend</p>
           <TrendChart data={trendData} />
         </section>
 
         {/* Weekly Summary */}
         {weeklyReport && (
           <section className="glass rounded-3xl p-6">
-            <p className="text-xs uppercase tracking-[0.15em] text-white/30 mb-4">This Week</p>
+            <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-4">This Week</p>
             <div className="flex justify-between items-center mb-4">
-              <span className="text-white/50 text-sm">平均</span>
+              <span className="text-[var(--text-tertiary)] text-sm">平均</span>
               <span className={`text-2xl font-light ${getScoreClass(weeklyReport.average_vibe_score)}`}>
                 {weeklyReport.average_vibe_score ?? '—'}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-white/50 text-sm">记录</span>
-              <span className="text-lg text-white/70">{weeklyReport.total_records}</span>
+              <span className="text-[var(--text-tertiary)] text-sm">记录</span>
+              <span className="text-lg text-[var(--text-secondary)]">{weeklyReport.total_records}</span>
             </div>
           </section>
         )}
 
         {/* Footer */}
         <footer className="mt-12 text-center">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/20">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
             Powered by vibing u
           </p>
         </footer>
@@ -152,7 +152,7 @@ export default function PublicPage() {
 
 function DimensionItem({ icon, label, score }: { icon: React.ReactNode; label: string; score: number | null }) {
   const getScoreClass = (score: number | null) => {
-    if (score === null) return 'text-white/30';
+    if (score === null) return 'text-[var(--text-tertiary)]';
     if (score >= 80) return 'text-emerald-400';
     if (score >= 60) return 'text-blue-400';
     if (score >= 40) return 'text-amber-400';
@@ -161,11 +161,11 @@ function DimensionItem({ icon, label, score }: { icon: React.ReactNode; label: s
 
   return (
     <div className="text-center">
-      <div className="text-white/30 flex justify-center mb-2">{icon}</div>
+      <div className="text-[var(--text-tertiary)] flex justify-center mb-2">{icon}</div>
       <p className={`text-lg font-light number-display ${getScoreClass(score)}`}>
         {score !== null ? score : '—'}
       </p>
-      <p className="text-[10px] text-white/30 mt-1">{label}</p>
+      <p className="text-[10px] text-[var(--text-tertiary)] mt-1">{label}</p>
     </div>
   );
 }
@@ -173,7 +173,7 @@ function DimensionItem({ icon, label, score }: { icon: React.ReactNode; label: s
 function TrendChart({ data }: { data: TrendData[] }) {
   const validData = data.filter(d => d.vibe_score !== null);
   if (validData.length === 0) {
-    return <p className="text-center text-white/20 text-sm py-6">No data</p>;
+    return <p className="text-center text-[var(--text-tertiary)] text-sm py-6">No data</p>;
   }
 
   const maxScore = Math.max(...validData.map(d => d.vibe_score!));
@@ -215,7 +215,7 @@ function TrendChart({ data }: { data: TrendData[] }) {
         })}
       </svg>
 
-      <div className="flex justify-between text-[10px] text-white/20 mt-1">
+      <div className="flex justify-between text-[10px] text-[var(--text-tertiary)] mt-1">
         <span>{data[0]?.date.slice(5)}</span>
         <span>{data[data.length - 1]?.date.slice(5)}</span>
       </div>

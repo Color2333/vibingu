@@ -12,6 +12,7 @@
 - 个性化健康建议
 - 智能风险评估
 """
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta, date
 from collections import defaultdict
@@ -22,6 +23,8 @@ from sqlalchemy import and_
 
 from app.database import SessionLocal
 from app.models import LifeStream, DailySummary
+
+logger = logging.getLogger(__name__)
 
 
 class Predictor:
@@ -975,7 +978,7 @@ class Predictor:
                 raise ValueError("AI 返回格式错误")
                 
         except Exception as e:
-            print(f"AI 预测错误: {e}")
+            logger.error(f"AI 预测错误: {e}")
             return {
                 **base_prediction,
                 "ai_enhanced": False,
@@ -1055,7 +1058,7 @@ class Predictor:
                 raise ValueError("AI 返回格式错误")
                 
         except Exception as e:
-            print(f"AI 风险检测错误: {e}")
+            logger.error(f"AI 风险检测错误: {e}")
             return {
                 "has_data": True,
                 "ai_analysis": None,

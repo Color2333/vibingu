@@ -13,6 +13,7 @@
 """
 import os
 import json
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -25,6 +26,8 @@ from sqlalchemy import and_
 from app.database import SessionLocal
 from app.models import LifeStream
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 settings = get_settings()
@@ -102,7 +105,7 @@ class RAGService:
             
             return True
         except Exception as e:
-            print(f"索引记录失败: {e}")
+            logger.error(f"索引记录失败: {e}")
             return False
     
     def index_all_records(self, batch_size: int = 100) -> Dict[str, Any]:
@@ -212,7 +215,7 @@ class RAGService:
             )
             return response.data[0].embedding
         except Exception as e:
-            print(f"获取嵌入向量失败: {e}")
+            logger.error(f"获取嵌入向量失败: {e}")
             return None
     
     # ========== 语义搜索 ==========
@@ -258,7 +261,7 @@ class RAGService:
             
             return formatted
         except Exception as e:
-            print(f"搜索失败: {e}")
+            logger.error(f"搜索失败: {e}")
             return []
     
     def find_similar_days(self, date: Optional[datetime] = None, n_results: int = 5) -> List[Dict[str, Any]]:
@@ -384,7 +387,7 @@ class RAGService:
             }
             
         except Exception as e:
-            print(f"RAG 问答失败: {e}")
+            logger.error(f"RAG 问答失败: {e}")
             return {
                 "answer": f"处理问题时出错: {str(e)}",
                 "sources": [],
@@ -514,7 +517,7 @@ class RAGService:
             }
             
         except Exception as e:
-            print(f"RAG 问答失败: {e}")
+            logger.error(f"RAG 问答失败: {e}")
             return {
                 "answer": f"处理问题时出错，请稍后重试。",
                 "sources": [],
@@ -588,7 +591,7 @@ class RAGService:
             }
             
         except Exception as e:
-            print(f"生成主题摘要失败: {e}")
+            logger.error(f"生成主题摘要失败: {e}")
             return {"has_data": False, "error": str(e)}
     
     def get_life_insights(self, period_days: int = 30) -> Dict[str, Any]:
@@ -659,7 +662,7 @@ class RAGService:
             }
             
         except Exception as e:
-            print(f"生成生活洞察失败: {e}")
+            logger.error(f"生成生活洞察失败: {e}")
             return {"has_data": False, "error": str(e)}
     
     def _get_time_context(self) -> str:

@@ -6,6 +6,7 @@
 3. 标签趋势分析
 4. 智能标签补全
 """
+import logging
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -17,6 +18,8 @@ from sqlalchemy import func
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models import LifeStream
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -102,7 +105,7 @@ class TaggerAgent:
             return tags[:8]  # 最多8个标签
             
         except Exception as e:
-            print(f"AI 标签生成错误: {e}")
+            logger.warning(f"AI 标签生成错误: {e}")
             return self._rule_based_tags(text, category, meta_data)
     
     async def _ai_generate_tags(
@@ -179,7 +182,7 @@ class TaggerAgent:
                 return self._rule_based_tags(text, category, meta_data)
                 
         except Exception as e:
-            print(f"AI 标签生成失败: {e}")
+            logger.warning(f"AI 标签生成失败: {e}")
             return self._rule_based_tags(text, category, meta_data)
     
     async def get_related_tags(self, tags: List[str], limit: int = 5) -> List[str]:

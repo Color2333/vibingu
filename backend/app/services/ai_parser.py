@@ -1,10 +1,12 @@
 import json
+import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 from openai import AsyncOpenAI
 from app.config import get_settings
 from app.services.token_tracker import record_usage
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -44,7 +46,7 @@ class AIParser:
         try:
             return await self._openai_parse(text, image_base64, category_hint, record_id)
         except Exception as e:
-            print(f"AI 解析错误: {e}")
+            logger.error(f"AI 解析错误: {e}")
             return self._mock_parse(text, image_base64, category_hint)
     
     async def _openai_parse(
@@ -139,7 +141,7 @@ class AIParser:
                     related_record_id=record_id
                 )
             except Exception as e:
-                print(f"Token 记录失败: {e}")
+                logger.warning(f"Token 记录失败: {e}")
         
         result_text = response.choices[0].message.content
         return json.loads(result_text)

@@ -94,7 +94,7 @@ export default function TimelinePage() {
   };
 
   const getScoreClass = (score: number | null) => {
-    if (score === null) return 'text-white/30';
+    if (score === null) return 'text-[var(--text-tertiary)]';
     if (score >= 80) return 'text-emerald-400';
     if (score >= 60) return 'text-blue-400';
     if (score >= 40) return 'text-amber-400';
@@ -104,7 +104,7 @@ export default function TimelinePage() {
   if (authLoading) {
     return (
       <div className="min-h-screen gradient-mesh flex items-center justify-center">
-        <div className="text-white/30 animate-pulse">Loading...</div>
+        <div className="text-[var(--text-tertiary)] animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -118,20 +118,21 @@ export default function TimelinePage() {
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
-          <Link href="/" className="p-2 text-white/40 hover:text-white/70 transition-colors">
+          <Link href="/" className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors" aria-label="返回首页">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center gap-4">
-            <button onClick={prevMonth} className="p-2 text-white/40 hover:text-white/70 transition-colors">
+            <button onClick={prevMonth} className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors" aria-label="上个月">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-light text-white/80">
+            <h1 className="text-lg font-light text-[var(--text-secondary)]">
               {currentMonth.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}
             </h1>
             <button 
               onClick={nextMonth} 
-              className="p-2 text-white/40 hover:text-white/70 transition-colors disabled:opacity-30"
+              className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-30"
               disabled={currentMonth.getMonth() === new Date().getMonth() && currentMonth.getFullYear() === new Date().getFullYear()}
+              aria-label="下个月"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -158,7 +159,7 @@ export default function TimelinePage() {
           </div>
         ) : (
           <div className="text-center py-16">
-            <p className="text-white/40">这个月还没有记录</p>
+            <p className="text-[var(--text-tertiary)]">这个月还没有记录</p>
           </div>
         )}
       </div>
@@ -176,8 +177,8 @@ function DayCard({ day, getScoreClass }: { day: DayData; getScoreClass: (score: 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="text-center">
-            <p className="text-2xl font-light text-white/80">{date.getDate()}</p>
-            <p className="text-[10px] text-white/40 uppercase">
+            <p className="text-2xl font-light text-[var(--text-secondary)]">{date.getDate()}</p>
+            <p className="text-[10px] text-[var(--text-tertiary)] uppercase">
               {date.toLocaleDateString('zh-CN', { weekday: 'short' })}
             </p>
           </div>
@@ -191,7 +192,7 @@ function DayCard({ day, getScoreClass }: { day: DayData; getScoreClass: (score: 
           <p className={`text-2xl font-light number-display ${getScoreClass(day.vibe_score)}`}>
             {day.vibe_score ?? '—'}
           </p>
-          <p className="text-[10px] text-white/30">{day.records.length} 条记录</p>
+          <p className="text-[10px] text-[var(--text-tertiary)]">{day.records.length} 条记录</p>
         </div>
       </div>
 
@@ -202,17 +203,17 @@ function DayCard({ day, getScoreClass }: { day: DayData; getScoreClass: (score: 
           return (
             <div key={record.id} className="flex items-start gap-2 text-sm">
               <span className={`mt-1 ${config.color}`}>{config.icon}</span>
-              <p className="text-white/60 flex-1 line-clamp-1">
+              <p className="text-[var(--text-secondary)] flex-1 line-clamp-1">
                 {record.ai_insight || '—'}
               </p>
-              <span className="text-[10px] text-white/30">
+              <span className="text-[10px] text-[var(--text-tertiary)]">
                 {new Date(record.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           );
         })}
         {day.records.length > 5 && (
-          <p className="text-xs text-white/30 text-center">+{day.records.length - 5} 更多</p>
+          <p className="text-xs text-[var(--text-tertiary)] text-center">+{day.records.length - 5} 更多</p>
         )}
       </div>
     </div>

@@ -111,7 +111,7 @@ export default function ChatAssistant() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
@@ -123,6 +123,7 @@ export default function ChatAssistant() {
       {/* Floating button - 位置调高避免遮挡输入框 */}
       <button
         onClick={() => setIsOpen(true)}
+        aria-label="打开 AI 助手"
         className={`fixed bottom-28 right-6 w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 shadow-lg hover:shadow-xl transition-all z-40 flex items-center justify-center ${
           isOpen ? 'scale-0' : 'scale-100'
         }`}
@@ -146,6 +147,7 @@ export default function ChatAssistant() {
           </div>
           <button
             onClick={() => setIsOpen(false)}
+            aria-label="关闭对话"
             className="p-1 rounded-lg hover:bg-[var(--glass-bg)] transition-colors"
           >
             <X className="w-5 h-5 text-[var(--text-secondary)]" />
@@ -243,13 +245,14 @@ export default function ChatAssistant() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="问我任何关于你生活数据的问题..."
               className="flex-1 bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-purple-500/50"
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
+              aria-label="发送消息"
               className="p-2 rounded-xl bg-gradient-to-r from-purple-500/30 to-cyan-500/30 border border-[var(--border)] hover:border-purple-500/30 disabled:opacity-50 transition-all"
             >
               <Send className="w-5 h-5 text-[var(--text-primary)]" />

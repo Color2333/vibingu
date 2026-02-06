@@ -6,7 +6,8 @@ import {
   Moon, Utensils, Smartphone, Activity, Smile, Clock, 
   Image as ImageIcon, X, Users, Briefcase, BookOpen, 
   Gamepad2, Sparkles, Lightbulb, ChevronRight, MessageCircle,
-  MoreVertical, Trash2, Globe, Lock, Calendar
+  MoreVertical, Trash2, Globe, Lock, Calendar, XCircle,
+  ScanSearch, Brain, Tag, Check
 } from 'lucide-react';
 import type { FeedItem } from '@/components/pages/RecordPage';
 
@@ -64,6 +65,7 @@ const TimelineCard = memo(function TimelineCard({
 }: TimelineCardProps) {
   const [showImage, setShowImage] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const hasAnimatedRef = useRef(false);
@@ -85,7 +87,71 @@ const TimelineCard = memo(function TimelineCard({
   const category = item.category || 'MOOD';
   const config = categoryConfig[category] || categoryConfig.MOOD;
   const isPending = item._pending;
+  const isFailed = item._failed;
   const meta = item.meta_data || {};
+
+  // ===== 分析阶段动画（与后端实际流程对齐） =====
+  const hasImage = !!item._tempImagePreview || item.input_type === 'IMAGE' || item.input_type === 'SCREENSHOT';
+  const analysisPhases = [
+    { icon: <ScanSearch className="w-3.5 h-3.5" />, label: hasImage ? '图片分类' : '内容识别', duration: 4000 },
+    { icon: <Brain className="w-3.5 h-3.5" />, label: '数据提取与分析', duration: 8000 },
+    { icon: <Tag className="w-3.5 h-3.5" />, label: '生成标签', duration: 4000 },
+  ];
+  
+  const [currentPhase, setCurrentPhase] = useState(0);
+  const [phaseProgress, setPhaseProgress] = useState(0);
+  
+  useEffect(() => {
+    if (!isPending) {
+      setCurrentPhase(0);
+      setPhaseProgress(0);
+      return;
+    }
+    
+    let phaseIdx = 0;
+    let progressTimer: ReturnType<typeof setInterval>;
+    let phaseTimer: ReturnType<typeof setTimeout>;
+    
+    const startPhase = (idx: number) => {
+      if (idx >= analysisPhases.length) {
+        // 所有阶段完成，循环回到最后一个阶段的等待状态
+        setCurrentPhase(analysisPhases.length - 1);
+        setPhaseProgress(100);
+        return;
+      }
+      
+      phaseIdx = idx;
+      setCurrentPhase(idx);
+      setPhaseProgress(0);
+      
+      const duration = analysisPhases[idx].duration;
+      const step = 50; // 每50ms更新一次进度
+      const increment = (step / duration) * 100;
+      let progress = 0;
+      
+      progressTimer = setInterval(() => {
+        progress += increment;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(progressTimer);
+        }
+        setPhaseProgress(Math.min(progress, 100));
+      }, step);
+      
+      phaseTimer = setTimeout(() => {
+        clearInterval(progressTimer);
+        startPhase(idx + 1);
+      }, duration);
+    };
+    
+    startPhase(0);
+    
+    return () => {
+      clearInterval(progressTimer);
+      clearTimeout(phaseTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending]);
 
   // 动画效果
   useEffect(() => {
@@ -129,10 +195,14 @@ const TimelineCard = memo(function TimelineCard({
       <div className="flex flex-col items-center">
         {/* 时间轴节点 */}
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          isPending ? 'bg-indigo-500/20' : config.bgColor
-        } border-2 ${isPending ? 'border-indigo-500/40' : 'border-[var(--border)]'}`}>
-          {isPending ? (
-            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          isFailed ? 'bg-red-500/20' : isPending ? 'bg-indigo-500/20' : config.bgColor
+        } border-2 ${isFailed ? 'border-red-500/40' : isPending ? 'border-indigo-500/40' : 'border-[var(--border)]'}`}>
+          {isFailed ? (
+            <X className="w-4 h-4 text-red-400" />
+          ) : isPending ? (
+            <span className="text-indigo-400 animate-pulse">
+              {analysisPhases[currentPhase]?.icon || <Sparkles className="w-4 h-4" />}
+            </span>
           ) : (
             <span className={config.color}>{config.icon}</span>
           )}
@@ -144,10 +214,12 @@ const TimelineCard = memo(function TimelineCard({
       </div>
       
       {/* 右侧内容 */}
-      <div className={`flex-1 pb-4 rounded-2xl overflow-hidden transition-colors ${
-        isPending 
-          ? 'bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20' 
-          : 'glass-card hover:bg-[var(--glass-bg)] cursor-pointer'
+      <div className={`flex-1 pb-4 rounded-2xl overflow-hidden transition-all duration-500 ${
+        isFailed
+          ? 'bg-gradient-to-br from-red-500/5 to-orange-500/5 border border-red-500/20 opacity-80'
+          : isPending 
+            ? 'bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20' 
+            : 'glass-card hover:bg-[var(--glass-bg)] cursor-pointer'
       }`}>
         <div className="p-4">
           {/* 头部：时间 + 分类 + 分数 + 操作 */}
@@ -158,8 +230,8 @@ const TimelineCard = memo(function TimelineCard({
                 <Clock className="w-3 h-3" />
                 {formatTime(item.record_time || item.created_at)}
               </span>
-              <span className={`text-xs font-medium ${isPending ? 'text-indigo-400' : config.color}`}>
-                {isPending ? '分析中...' : config.label}
+              <span className={`text-xs font-medium ${isFailed ? 'text-red-400' : isPending ? 'text-indigo-400' : config.color}`}>
+                {isFailed ? '发送失败' : isPending ? `${analysisPhases[currentPhase]?.label || '分析中'}...` : config.label}
               </span>
               {/* 公开标签 */}
               {!isPending && item.is_public && (
@@ -203,6 +275,7 @@ const TimelineCard = memo(function TimelineCard({
                       setShowMenu(!showMenu);
                     }}
                     className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+                    aria-label="更多操作"
                     title="更多操作"
                   >
                     <MoreVertical className="w-4 h-4" />
@@ -233,10 +306,8 @@ const TimelineCard = memo(function TimelineCard({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm('确定要删除这条记录吗？')) {
-                            onDelete?.(item.id);
-                          }
                           setShowMenu(false);
+                          setShowDeleteConfirm(true);
                         }}
                         className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[var(--glass-bg)] flex items-center gap-2"
                       >
@@ -305,11 +376,62 @@ const TimelineCard = memo(function TimelineCard({
               return null;
             })()}
             
-            {/* Pending 状态 */}
+            {/* Pending 状态 - 分阶段动画 */}
             {isPending && (
-              <div className="flex items-center gap-2 text-sm text-indigo-400/80">
-                <Sparkles className="w-4 h-4 animate-pulse" />
-                <span>AI 正在分析...</span>
+              <div className="space-y-2.5">
+                {/* 阶段步骤条 */}
+                <div className="flex items-center gap-1">
+                  {analysisPhases.map((phase, idx) => (
+                    <div key={idx} className="flex items-center gap-1">
+                      {/* 步骤圆点 */}
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        idx < currentPhase
+                          ? 'bg-indigo-500/30 text-indigo-300'
+                          : idx === currentPhase
+                            ? 'bg-indigo-500/20 text-indigo-400 ring-2 ring-indigo-400/30 ring-offset-1 ring-offset-transparent'
+                            : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)]'
+                      }`}>
+                        {idx < currentPhase ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <span className="text-[8px] font-bold">{idx + 1}</span>
+                        )}
+                      </div>
+                      {/* 连接线 */}
+                      {idx < analysisPhases.length - 1 && (
+                        <div className="w-4 h-0.5 rounded-full overflow-hidden bg-[var(--glass-bg)]">
+                          <div
+                            className="h-full bg-indigo-400/50 transition-all duration-300 rounded-full"
+                            style={{
+                              width: idx < currentPhase ? '100%' : idx === currentPhase ? `${phaseProgress}%` : '0%'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 当前阶段详情 */}
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="text-indigo-400 animate-pulse">
+                    {analysisPhases[currentPhase]?.icon}
+                  </div>
+                  <span className="text-indigo-400/80 font-medium">
+                    {analysisPhases[currentPhase]?.label}...
+                  </span>
+                  <span className="text-[var(--text-tertiary)] text-xs">
+                    {currentPhase + 1}/{analysisPhases.length}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* 失败状态 */}
+            {isFailed && (
+              <div className="flex items-center gap-2 text-sm text-red-400/80">
+                <XCircle className="w-4 h-4" />
+                <span>{item._errorMsg || '发送失败，内容已恢复到输入框'}</span>
               </div>
             )}
 
@@ -340,17 +462,17 @@ const TimelineCard = memo(function TimelineCard({
             )}
           </div>
 
-          {/* 临时图片 */}
-          {isPending && item._tempImagePreview && (
+          {/* 临时图片（pending 和 failed 状态都显示） */}
+          {(isPending || isFailed) && item._tempImagePreview && (
             <div className="mt-2">
-              <img src={item._tempImagePreview} alt="" className="h-20 w-auto rounded-lg opacity-60" />
+              <img src={item._tempImagePreview} alt="上传预览" loading="lazy" className={`h-20 w-auto rounded-lg ${isFailed ? 'opacity-40' : 'opacity-60'}`} />
             </div>
           )}
 
           {/* 保存的图片 */}
           {!isPending && item.image_saved && item.thumbnail_path && (
             <button onClick={(e) => { e.stopPropagation(); setShowImage(true); }} className="mt-2 relative group">
-              <img src={item.thumbnail_path} alt="" className="h-20 w-auto rounded-lg opacity-80 group-hover:opacity-100 transition-opacity" />
+              <img src={item.thumbnail_path} alt="记录图片" loading="lazy" className="h-20 w-auto rounded-lg opacity-80 group-hover:opacity-100 transition-opacity" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                 <ImageIcon className="w-4 h-4 text-white" />
               </div>
@@ -384,10 +506,37 @@ const TimelineCard = memo(function TimelineCard({
       {/* 图片模态框 */}
       {showImage && item.image_path && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setShowImage(false)}>
-          <button onClick={() => setShowImage(false)} className="absolute top-4 right-4 p-2 text-white/60 hover:text-white">
+          <button onClick={() => setShowImage(false)} aria-label="关闭图片" className="absolute top-4 right-4 p-2 text-white/60 hover:text-white">
             <X className="w-6 h-6" />
           </button>
-          <img src={item.image_path} alt="" className="max-w-full max-h-full rounded-xl" onClick={e => e.stopPropagation()} />
+          <img src={item.image_path} alt="记录图片详情" loading="lazy" className="max-w-full max-h-full rounded-xl" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* 删除确认对话框 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">确认删除</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-5">删除后无法恢复，确定要删除这条记录吗？</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm rounded-lg bg-[var(--glass-bg)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  onDelete?.(item.id);
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-4 py-2 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+              >
+                删除
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -395,7 +544,7 @@ const TimelineCard = memo(function TimelineCard({
 }, (prevProps, nextProps) => {
   const p = prevProps.item;
   const n = nextProps.item;
-  return p.id === n.id && p._pending === n._pending && p.ai_insight === n.ai_insight && p.is_public === n.is_public;
+  return p.id === n.id && p._pending === n._pending && p._failed === n._failed && p.ai_insight === n.ai_insight && p.is_public === n.is_public;
 });
 
 // ========== 主组件 ==========

@@ -3,6 +3,7 @@
 提供自然语言查询功能，帮助用户理解和分析自己的生活数据。
 集成 RAG 系统进行智能问答。
 """
+import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -12,6 +13,8 @@ from sqlalchemy import and_, func
 
 from app.database import SessionLocal
 from app.models import LifeStream, DailySummary
+
+logger = logging.getLogger(__name__)
 
 
 class ChatAssistant:
@@ -29,7 +32,7 @@ class ChatAssistant:
                 from app.services.rag import get_rag_service
                 self._rag_service = get_rag_service()
             except Exception as e:
-                print(f"RAG 服务加载失败: {e}")
+                logger.warning(f"RAG 服务加载失败: {e}")
         return self._rag_service
     
     def __del__(self):
@@ -625,7 +628,7 @@ class ChatAssistant:
                         "content": content
                     }
             except Exception as e:
-                print(f"RAG 问答失败: {e}")
+                logger.error(f"RAG 问答失败: {e}")
         
         # RAG 失败或无法回答，返回帮助信息
         return {

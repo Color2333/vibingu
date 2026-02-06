@@ -23,6 +23,8 @@ export interface FeedItem {
   dimension_scores?: Record<string, number>;
   is_public?: boolean;
   _pending?: boolean;
+  _failed?: boolean;       // 提交失败
+  _errorMsg?: string;      // 错误信息
   _tempImagePreview?: string;
 }
 
@@ -158,14 +160,37 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     showToast('success', toastMessage);
   }, [showToast, feedIds]);
 
-  // 处理失败：移除临时记录
-  const handleFeedError = useCallback(() => {
+  // 处理失败：将临时记录标记为失败状态（而不是直接移除）
+  const handleFeedError = useCallback((errorMsg?: string) => {
     setFeedIds(prev => {
       const tempIds = prev.filter(id => id.startsWith('temp-'));
-      tempIds.forEach(id => feedDataRef.current.delete(id));
-      return prev.filter(id => !id.startsWith('temp-'));
+      tempIds.forEach(id => {
+        const item = feedDataRef.current.get(id);
+        if (item) {
+          feedDataRef.current.set(id, {
+            ...item,
+            _pending: false,
+            _failed: true,
+            _errorMsg: errorMsg || '提交失败',
+          });
+        }
+      });
+      // 触发重渲染
+      return [...prev];
     });
-    showToast('error', '记录失败，内容已恢复，点击发送重试');
+    showToast('error', errorMsg || '记录失败，内容已恢复，点击发送重试');
+    
+    // 5秒后移除失败的临时记录
+    setTimeout(() => {
+      setFeedIds(prev => {
+        const failedIds = prev.filter(id => {
+          const item = feedDataRef.current.get(id);
+          return item?._failed;
+        });
+        failedIds.forEach(id => feedDataRef.current.delete(id));
+        return prev.filter(id => !failedIds.includes(id));
+      });
+    }, 5000);
   }, [showToast]);
 
   // 删除记录

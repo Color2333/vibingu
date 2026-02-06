@@ -5,15 +5,24 @@
 
 import json
 import re
+import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from openai import AsyncOpenAI
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
 # 默认时区（北京时间 UTC+8）
 DEFAULT_TIMEZONE = timezone(timedelta(hours=8))
+
+# 导入全局并发控制器
+def _get_concurrency_limiter():
+    """延迟导入并发控制器，避免循环导入"""
+    from app.services.ai_client import _concurrency_limiter
+    return _concurrency_limiter
 
 
 class DataExtractor:
@@ -23,8 +32,8 @@ class DataExtractor:
         api_key = settings.get_ai_api_key()
         base_url = settings.get_ai_base_url()
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
-        self.vision_model = settings.vision_model   # 有图像时用视觉模型
-        self.text_model = settings.text_model       # 纯文本用便宜模型
+        self.vision_model = settings.vision_model   # glm-4.6v (付费，速率限制更宽松)
+        self.text_model = settings.text_model       # glm-4.7 (付费，速率限制更宽松)
     
     def _parse_client_time(self, client_time: Optional[str]) -> datetime:
         """解析客户端时间并转换为本地时间"""
@@ -36,7 +45,7 @@ class DataExtractor:
                 local_dt = dt.astimezone(DEFAULT_TIMEZONE)
                 return local_dt
             except Exception as e:
-                print(f"时间解析错误: {e}, client_time={client_time}")
+                logger.warning(f"时间解析错误: {e}, client_time={client_time}")
         # 返回当前本地时间
         return datetime.now(DEFAULT_TIMEZONE)
     
@@ -110,7 +119,7 @@ class DataExtractor:
                 return yesterday
             
         except Exception as e:
-            print(f"记录时间解析错误: {e}, record_time={record_time_str}")
+            logger.warning(f"记录时间解析错误: {e}, record_time={record_time_str}")
         
         return None
     
@@ -154,7 +163,7 @@ class DataExtractor:
             else:
                 return await self._extract_general(image_base64, text, image_type, client_time)
         except Exception as e:
-            print(f"数据提取错误: {e}")
+            logger.error(f"数据提取错误: {e}")
             import traceback
             traceback.print_exc()
             return self._mock_extract(image_type, text, content_hint, client_time)
@@ -462,7 +471,7 @@ class DataExtractor:
         category: str,
         client_time: Optional[str] = None
     ) -> Dict[str, Any]:
-        """调用 AI 接口"""
+        """调用 AI 接口（带速率限制和重试）"""
         
         user_content = []
         
@@ -483,37 +492,57 @@ class DataExtractor:
         # 根据是否有图像选择模型
         model = self.vision_model if image_base64 else self.text_model
         
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ],
-            max_tokens=1500,  # 增加 token 限制以容纳分析
-            response_format={"type": "json_object"},
-        )
+        # 获取并发控制器
+        limiter = _get_concurrency_limiter()
         
-        result = json.loads(response.choices[0].message.content)
+        # 获取并发许可，繁忙时自动升级到高并发模型
+        acquired, actual_model = await limiter.acquire_with_upgrade(model, timeout=60.0)
+        if not acquired:
+            raise Exception(f"模型 {model} 并发已满，等待超时")
         
-        # 确保 analysis 和 suggestions 存在
-        meta_data = {k: v for k, v in result.items() if k not in ["reply_text", "record_time", "record_date"]}
-        if "analysis" not in meta_data:
-            meta_data["analysis"] = None
-        if "suggestions" not in meta_data:
-            meta_data["suggestions"] = []
-        
-        # 处理 record_time（实际发生时间）
-        record_time = None
-        record_time_str = result.get("record_time") or result.get("record_date")
-        if record_time_str:
-            record_time = self._parse_record_time(record_time_str, client_time)
-        
-        return {
-            "category": category,
-            "meta_data": meta_data,
-            "reply_text": result.get("reply_text", "已记录"),
-            "record_time": record_time,
-        }
+        try:
+            response = await self.client.chat.completions.create(
+                model=actual_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ],
+                max_tokens=1500,
+            )
+            
+            # 提取 JSON（AI 可能返回额外文本）
+            content = response.choices[0].message.content.strip()
+            start_idx = content.find('{')
+            end_idx = content.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                json_str = content[start_idx:end_idx + 1]
+                result = json.loads(json_str)
+            else:
+                result = json.loads(content)
+            
+            # 确保 analysis 和 suggestions 存在
+            meta_data = {k: v for k, v in result.items() if k not in ["reply_text", "record_time", "record_date"]}
+            if "analysis" not in meta_data:
+                meta_data["analysis"] = None
+            if "suggestions" not in meta_data:
+                meta_data["suggestions"] = []
+            
+            # 处理 record_time（实际发生时间）
+            record_time = None
+            record_time_str = result.get("record_time") or result.get("record_date")
+            if record_time_str:
+                record_time = self._parse_record_time(record_time_str, client_time)
+            
+            return {
+                "category": category,
+                "meta_data": meta_data,
+                "reply_text": result.get("reply_text", "已记录"),
+                "record_time": record_time,
+            }
+        finally:
+            # 释放实际使用的模型的并发许可
+            limiter.release(actual_model)
     
     def _mock_extract(
         self, 

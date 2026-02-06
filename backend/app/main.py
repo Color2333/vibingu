@@ -6,6 +6,16 @@ from app.config import get_settings
 from app.database import engine, Base
 from app.routers import feed_router, history_router, analytics_router, reports_router, auth_router, tokens_router, tags_router, time_intel_router, predict_router, chat_router, gamification_router, rag_router
 from app.routers.ai_analysis import router as ai_analysis_router
+import logging
+
+# 全局日志配置
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -35,22 +45,22 @@ def run_migrations():
         # 添加 record_time 列（v0.3）
         if "record_time" not in columns:
             cursor.execute("ALTER TABLE life_stream ADD COLUMN record_time DATETIME")
-            print("✅ 自动迁移: 添加 record_time 列")
+            logger.info("自动迁移: 添加 record_time 列")
         
         # 添加 is_public 列（v0.4）
         if "is_public" not in columns:
             cursor.execute("ALTER TABLE life_stream ADD COLUMN is_public BOOLEAN DEFAULT 0")
-            print("✅ 自动迁移: 添加 is_public 列")
+            logger.info("自动迁移: 添加 is_public 列")
         
         # 添加 is_deleted 列（v0.4）
         if "is_deleted" not in columns:
             cursor.execute("ALTER TABLE life_stream ADD COLUMN is_deleted BOOLEAN DEFAULT 0")
-            print("✅ 自动迁移: 添加 is_deleted 列")
+            logger.info("自动迁移: 添加 is_deleted 列")
         
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"⚠️ 自动迁移失败: {e}")
+        logger.error(f"自动迁移失败: {e}")
 
 
 @asynccontextmanager
@@ -76,8 +86,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # 注册路由

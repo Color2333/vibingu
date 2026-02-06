@@ -6,10 +6,13 @@
 import os
 import base64
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, Tuple
 from PIL import Image
 import io
+
+logger = logging.getLogger(__name__)
 
 
 class ImageStorage:
@@ -99,7 +102,7 @@ class ImageStorage:
             return image_path, thumbnail_path
             
         except Exception as e:
-            print(f"图片保存错误: {e}")
+            logger.error(f"图片保存错误: {e}")
             raise
     
     def _resize_image(self, image: Image.Image, max_size: Tuple[int, int]) -> Image.Image:
@@ -120,7 +123,7 @@ class ImageStorage:
                 return True
             return False
         except Exception as e:
-            print(f"删除图片错误: {e}")
+            logger.error(f"删除图片错误: {e}")
             return False
     
     def get_storage_stats(self) -> dict:

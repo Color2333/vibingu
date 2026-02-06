@@ -13,6 +13,7 @@
 - 最佳状态条件归因
 - 智能提醒生成
 """
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta, time
 from collections import defaultdict
@@ -23,6 +24,8 @@ from sqlalchemy import and_, func
 
 from app.database import SessionLocal
 from app.models import LifeStream, DailySummary
+
+logger = logging.getLogger(__name__)
 
 
 # 时间段定义
@@ -749,7 +752,7 @@ class TimeIntelligence:
                 raise ValueError("AI 返回格式错误")
                 
         except Exception as e:
-            print(f"AI 时间分析错误: {e}")
+            logger.error(f"AI 时间分析错误: {e}")
             # 返回基础分析
             return {
                 "has_data": True,

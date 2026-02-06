@@ -62,7 +62,7 @@ interface MagicInputBarProps {
   onSuccess: (response: FeedResponse) => void;
   onLoading: (loading: boolean) => void;
   onOptimisticAdd?: (data: { text: string; imagePreview: string | null }) => void;
-  onError?: () => void;
+  onError?: (errorMsg?: string) => void;
 }
 
 export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError }: MagicInputBarProps) {
@@ -200,13 +200,21 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
       const clientTime = new Date().toISOString();
       formData.append('client_time', clientTime);
 
+      const controller = new AbortController();
+      // 90秒超时（AI分析可能耗时较长）
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      
       const response = await fetch('/api/feed', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error('提交失败');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || '提交失败');
       }
 
       const data = await response.json();
@@ -219,8 +227,13 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
         setImage(currentImage);
         setImagePreview(currentImagePreview);
       }
+      
+      const errorMsg = err instanceof DOMException && err.name === 'AbortError'
+        ? '请求超时，请重试'
+        : err instanceof Error ? err.message : '提交失败';
+      
       if (onError) {
-        onError();
+        onError(errorMsg);
       }
     } finally {
       setIsSubmitting(false);

@@ -1,7 +1,7 @@
 import uuid
 import enum
 import json
-from sqlalchemy import Column, String, Text, DateTime, Enum, TypeDecorator, Boolean
+from sqlalchemy import Column, String, Text, DateTime, Enum, TypeDecorator, Boolean, Index
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -59,6 +59,15 @@ class LifeStream(Base):
     """全维生活流表 - 核心数据集表，存储所有的照片、对话、记录"""
     
     __tablename__ = "life_stream"
+    __table_args__ = (
+        Index("ix_life_stream_created_at", "created_at"),
+        Index("ix_life_stream_category", "category"),
+        Index("ix_life_stream_is_deleted", "is_deleted"),
+        Index("ix_life_stream_is_public", "is_public"),
+        Index("ix_life_stream_record_time", "record_time"),
+        # 复合索引：常见查询模式（未删除 + 按时间排序）
+        Index("ix_life_stream_active_time", "is_deleted", "created_at"),
+    )
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="唯一标识")
     user_id = Column(String(36), nullable=True, comment="用户ID(为未来多用户预留)")

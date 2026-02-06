@@ -10,6 +10,9 @@ from typing import Optional, List
 from pydantic import BaseModel
 import base64
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models import LifeStream, InputType, Category
@@ -32,7 +35,7 @@ def get_rag():
             from app.services.rag import get_rag_service
             _rag_service = get_rag_service()
         except Exception as e:
-            print(f"RAG 服务加载失败: {e}")
+            logger.warning(f"RAG 服务加载失败: {e}")
     return _rag_service
 
 router = APIRouter(prefix="/api/feed", tags=["feed"])
@@ -113,40 +116,59 @@ async def create_feed(
     
     # ===== Phase 1: 图片分类 =====
     if image:
+        # 文件大小限制：最大 10MB
         content = await image.read()
+        MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+        if len(content) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=413, detail=f"图片大小超过限制（最大 {MAX_IMAGE_SIZE // 1024 // 1024}MB）")
         image_base64 = base64.b64encode(content).decode("utf-8")
         
-        # 调用分类 Agent
-        classification_result = await image_classifier.classify(
-            image_base64=image_base64,
-            text_hint=text or category_hint,
-        )
-        
-        image_type = classification_result["image_type"]
-        should_save_image = classification_result["should_save_image"]
+        try:
+            classification_result = await image_classifier.classify(
+                image_base64=image_base64,
+                text_hint=text or category_hint,
+            )
+            image_type = classification_result["image_type"]
+            should_save_image = classification_result["should_save_image"]
+        except Exception as e:
+            logger.warning(f"[Phase 1] 图片分类失败，使用默认分类: {e}")
+            # 分类失败，使用默认值，不阻止记录保存
+            classification_result = None
+            image_type = "other"
+            should_save_image = True  # 保守起见保存原图
         
         # 设置输入类型
         if image_type in ["screenshot", "activity_screenshot", "sleep_screenshot"]:
             input_type = InputType.SCREENSHOT.value
         else:
             input_type = InputType.IMAGE.value
+        
     
     # ===== Phase 2: 数据提取 =====
-    if image_base64:
-        extract_result = await data_extractor.extract(
-            image_type=image_type or "other",
-            image_base64=image_base64,
-            text=text,
-            content_hint=classification_result.get("content_hint") if classification_result else None,
-            client_time=client_time,  # 传递客户端时间
-        )
-    else:
-        # 纯文本输入
-        extract_result = await data_extractor.extract(
-            image_type="other",
-            text=text,
-            client_time=client_time,  # 传递客户端时间
-        )
+    extract_result = {}
+    try:
+        if image_base64:
+            extract_result = await data_extractor.extract(
+                image_type=image_type or "other",
+                image_base64=image_base64,
+                text=text,
+                content_hint=classification_result.get("content_hint") if classification_result else None,
+                client_time=client_time,
+            )
+        else:
+            extract_result = await data_extractor.extract(
+                image_type="other",
+                text=text,
+                client_time=client_time,
+            )
+    except Exception as e:
+        logger.warning(f"[Phase 2] 数据提取失败，使用基础数据: {e}")
+        # 提取失败，用基础数据填充，记录仍然保存
+        extract_result = {
+            "category": category_hint.upper() if category_hint else "MOOD",
+            "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
+            "reply_text": text or "已记录（AI 分析暂时不可用）",
+        }
     
     # ===== Phase 3: 存储决策 =====
     if should_save_image and image_base64:
@@ -158,8 +180,7 @@ async def create_feed(
                 create_thumbnail=True,
             )
         except Exception as e:
-            print(f"图片保存失败: {e}")
-            # 保存失败不影响数据记录
+            logger.error(f"[Phase 3] 图片保存失败: {e}")
             image_path = None
             thumbnail_path = None
     
@@ -181,22 +202,31 @@ async def create_feed(
         }
     
     # ===== Phase 4: 智能标签生成 =====
-    tags = await tagger.generate_tags(
-        text=text,
-        category=category,
-        meta_data=meta_data,
-        record_id=None,  # 记录还未创建
-    )
+    tags = []
+    try:
+        tags = await tagger.generate_tags(
+            text=text,
+            category=category,
+            meta_data=meta_data,
+            record_id=None,
+        )
+    except Exception as e:
+        logger.warning(f"[Phase 4] 标签生成失败: {e}")
+        # 标签失败不影响记录保存
     
     # ===== Phase 5: 八维度分析 =====
-    dimension_scores = dimension_analyzer.calculate_dimension_scores(
-        category=category or "MOOD",
-        meta_data=meta_data,
-        tags=tags,
-    )
+    dimension_scores = {}
+    try:
+        dimension_scores = dimension_analyzer.calculate_dimension_scores(
+            category=category or "MOOD",
+            meta_data=meta_data,
+            tags=tags,
+        )
+    except Exception as e:
+        logger.warning(f"[Phase 5] 维度分析失败: {e}")
     
     # 确定记录发生时间
-    record_time = extract_result.get("record_time")  # AI 分析得出的实际发生时间
+    record_time = extract_result.get("record_time")
     
     # 存入数据库
     life_stream = LifeStream(
@@ -211,25 +241,25 @@ async def create_feed(
         image_saved=image_path is not None,
         tags=tags,
         dimension_scores=dimension_scores,
-        record_time=record_time,  # AI 分析的实际发生时间
+        record_time=record_time,
     )
     
     db.add(life_stream)
-    db.commit()
-    db.refresh(life_stream)
+    try:
+        db.commit()
+        db.refresh(life_stream)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"数据保存失败: {e}")
     
     # ===== Phase 6: 游戏化奖励 =====
     try:
         gamification = get_gamification_service()
-        # 更新连续记录和经验值
         gamification.update_streak()
-        # 更新挑战进度
         gamification.update_challenge_progress(None, category)
-        # 检查新徽章
         gamification.check_and_award_badges()
     except Exception as e:
-        print(f"游戏化更新失败: {e}")
-        # 游戏化失败不影响主流程
+        logger.warning(f"[Phase 6] 游戏化更新失败: {e}")
     
     # ===== Phase 7: RAG 索引 =====
     try:
@@ -237,8 +267,7 @@ async def create_feed(
         if rag:
             rag.index_record(life_stream)
     except Exception as e:
-        print(f"RAG 索引失败: {e}")
-        # RAG 索引失败不影响主流程
+        logger.warning(f"[Phase 7] RAG 索引失败: {e}")
     
     return FeedResponse(
         id=str(life_stream.id),
@@ -246,7 +275,7 @@ async def create_feed(
         meta_data=meta_data,
         ai_insight=extract_result.get("reply_text", "已记录"),
         created_at=life_stream.created_at,
-        record_time=life_stream.record_time or life_stream.created_at,  # 实际发生时间
+        record_time=life_stream.record_time or life_stream.created_at,
         image_saved=life_stream.image_saved,
         image_path=f"/api/feed/image/{image_path}" if image_path else None,
         thumbnail_path=f"/api/feed/image/{thumbnail_path}" if thumbnail_path else None,
@@ -412,12 +441,28 @@ async def get_image(path: str):
     
     - **path**: 图片路径
     """
-    full_path = os.path.join("uploads", path)
+    # 安全校验：防止路径遍历攻击
+    if ".." in path or path.startswith("/") or path.startswith("\\"):
+        raise HTTPException(status_code=400, detail="非法路径")
+    
+    # 解析真实路径并确保在 uploads 目录内
+    uploads_dir = os.path.realpath("uploads")
+    full_path = os.path.realpath(os.path.join("uploads", path))
+    
+    if not full_path.startswith(uploads_dir):
+        raise HTTPException(status_code=403, detail="禁止访问")
     
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="图片不存在")
     
-    return FileResponse(full_path, media_type="image/jpeg")
+    # 只允许图片类型
+    allowed_ext = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+    ext = os.path.splitext(full_path)[1].lower()
+    if ext not in allowed_ext:
+        raise HTTPException(status_code=400, detail="不支持的文件类型")
+    
+    media_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}
+    return FileResponse(full_path, media_type=media_types.get(ext, "image/jpeg"))
 
 
 @router.get("/stats")
@@ -550,7 +595,7 @@ async def chat_with_record(
             suggestions=suggestions
         )
     except Exception as e:
-        print(f"AI 对话失败: {e}")
+        logger.error(f"AI 对话失败: {e}")
         return RecordChatResponse(
             reply="抱歉，AI 服务暂时不可用，请稍后再试。",
             suggestions=None
@@ -574,7 +619,11 @@ async def delete_record(
         raise HTTPException(status_code=404, detail="记录不存在")
     
     record.is_deleted = True
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"删除失败: {e}")
     
     return {"success": True, "message": "记录已删除"}
 
@@ -603,6 +652,10 @@ async def update_visibility(
         raise HTTPException(status_code=404, detail="记录不存在")
     
     record.is_public = update.is_public
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"更新失败: {e}")
     
     return {"success": True, "is_public": record.is_public}

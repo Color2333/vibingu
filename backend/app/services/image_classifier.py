@@ -4,11 +4,20 @@
 """
 
 import json
+import logging
 from typing import Optional, Dict, Any
 from openai import AsyncOpenAI
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
+
+# 导入全局并发控制器
+def _get_concurrency_limiter():
+    """延迟导入并发控制器，避免循环导入"""
+    from app.services.ai_client import _concurrency_limiter
+    return _concurrency_limiter
 
 
 class ImageClassifier:
@@ -56,11 +65,11 @@ class ImageClassifier:
         try:
             return await self._ai_classify(image_base64, text_hint)
         except Exception as e:
-            print(f"图片分类错误: {e}")
+            logger.error(f"图片分类错误: {e}")
             return self._mock_classify(text_hint)
     
     async def _ai_classify(self, image_base64: str, text_hint: Optional[str]) -> Dict[str, Any]:
-        """使用 AI 进行图片分类"""
+        """使用 AI 进行图片分类（带速率限制和重试）"""
         
         system_prompt = """你是一个图片分类专家。请分析用户上传的图片，判断：
 
@@ -113,27 +122,48 @@ class ImageClassifier:
             }
         })
         
-        response = await self.client.chat.completions.create(
-            model=self.vision_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ],
-            max_tokens=500,
-            response_format={"type": "json_object"},
-        )
+        # 获取并发控制器
+        limiter = _get_concurrency_limiter()
         
-        result = json.loads(response.choices[0].message.content)
+        # 获取并发许可，flash 繁忙时自动升级到付费模型
+        acquired, actual_model = await limiter.acquire_with_upgrade(self.vision_model, timeout=60.0)
+        if not acquired:
+            raise Exception(f"模型 {self.vision_model} 并发已满，等待超时")
         
-        # 确保必要字段存在
-        return {
-            "image_type": result.get("image_type", "other"),
-            "should_save_image": result.get("should_save_image", False),
-            "save_reason": result.get("save_reason"),
-            "content_hint": result.get("content_hint", ""),
-            "confidence": result.get("confidence", 0.5),
-            "category_suggestion": result.get("category_suggestion", "MOOD"),
-        }
+        try:
+            response = await self.client.chat.completions.create(
+                model=actual_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ],
+                max_tokens=500,
+            )
+            
+            # 提取 JSON（AI 可能返回额外文本）
+            content = response.choices[0].message.content.strip()
+            
+            # 尝试找到 JSON 对象
+            start_idx = content.find('{')
+            end_idx = content.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                json_str = content[start_idx:end_idx + 1]
+                result = json.loads(json_str)
+            else:
+                result = json.loads(content)
+            
+            return {
+                "image_type": result.get("image_type", "other"),
+                "should_save_image": result.get("should_save_image", False),
+                "save_reason": result.get("save_reason"),
+                "content_hint": result.get("content_hint", ""),
+                "confidence": result.get("confidence", 0.5),
+                "category_suggestion": result.get("category_suggestion", "MOOD"),
+            }
+        finally:
+            # 释放实际使用的模型的并发许可
+            limiter.release(actual_model)
     
     def _mock_classify(self, text_hint: Optional[str] = None) -> Dict[str, Any]:
         """模拟分类（无 API Key 时使用）"""

@@ -4,6 +4,7 @@ AI 分析器 - 基于历史数据生成深度洞察
 
 import json
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from app.database import SessionLocal
 from app.models import LifeStream
 from app.services.ai_client import get_ai_client, AIClientError
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -286,7 +288,7 @@ class AIAnalyzer:
             content = result["content"]
             
             if not content:
-                print("AI 返回空内容")
+                logger.warning("AI 返回空内容")
                 return self._mock_analysis(data)
             
             if isinstance(content, dict):
@@ -302,10 +304,10 @@ class AIAnalyzer:
                 return self._mock_analysis(data)
                 
         except AIClientError as e:
-            print(f"AI 分析错误: {e}")
+            logger.error(f"AI 分析错误: {e}")
             return self._mock_analysis(data)
         except Exception as e:
-            print(f"AI 分析错误: {e}")
+            logger.error(f"AI 分析错误: {e}")
             return self._mock_analysis(data)
     
     async def _ai_analyze_trends(self, data: Dict, days: int) -> Dict[str, Any]:
@@ -367,7 +369,7 @@ class AIAnalyzer:
                 return self._mock_trend_analysis(data)
                 
         except Exception as e:
-            print(f"AI 趋势分析错误: {e}")
+            logger.error(f"AI 趋势分析错误: {e}")
             return self._mock_trend_analysis(data)
     
     async def _ai_generate_suggestions(self, data: Dict) -> Dict[str, Any]:
@@ -424,7 +426,7 @@ class AIAnalyzer:
                 return self._mock_suggestions(data)
                 
         except Exception as e:
-            print(f"AI 建议生成错误: {e}")
+            logger.error(f"AI 建议生成错误: {e}")
             return self._mock_suggestions(data)
     
     async def _ai_deep_insight(self, question: str, data: Dict) -> Dict[str, Any]:
@@ -476,7 +478,7 @@ class AIAnalyzer:
                 return {"answer": content, "confidence": "low"}
                 
         except Exception as e:
-            print(f"AI 深度洞察错误: {e}")
+            logger.error(f"AI 深度洞察错误: {e}")
             return {"answer": f"分析出错: {str(e)}", "confidence": "low"}
     
     def _mock_analysis(self, data: Dict) -> Dict[str, Any]:
