@@ -19,16 +19,16 @@ logger = logging.getLogger(__name__)
 _CODE_BLOCK_RE = re.compile(r'```(?:json)?\s*\n?(.*?)\n?\s*```', re.DOTALL)
 
 
-def extract_json(raw_content: str, model_name: str = "") -> dict:
+def extract_json(raw_content: str, model_name: str = "") -> Any:
     """
-    从 AI 返回内容中健壮地提取 JSON。
+    从 AI 返回内容中健壮地提取 JSON（支持 object 和 array）。
     
     Args:
         raw_content: AI 返回的原始文本
         model_name: 模型名称（仅用于日志）
     
     Returns:
-        解析后的 dict
+        解析后的 dict 或 list
     
     Raises:
         ValueError: 无法从内容中提取有效 JSON
@@ -38,25 +38,53 @@ def extract_json(raw_content: str, model_name: str = "") -> dict:
     
     content = raw_content.strip()
     
+    # 0) 先尝试直接解析整个内容（处理纯 JSON 返回）
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+    
     # 1) 尝试去掉 markdown 代码块标记
     code_match = _CODE_BLOCK_RE.search(content)
     if code_match:
         content = code_match.group(1).strip()
+        # 去掉代码块后再尝试直接解析
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
     
-    # 2) 找到第一个 { 和最后一个 }
-    start_idx = content.find('{')
-    end_idx = content.rfind('}')
+    # 2) 尝试提取 JSON 对象 {...}
+    obj_start = content.find('{')
+    obj_end = content.rfind('}')
     
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        json_str = content[start_idx:end_idx + 1]
+    if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+        json_str = content[obj_start:obj_end + 1]
         try:
             return json.loads(json_str)
         except json.JSONDecodeError:
             pass  # 继续尝试修复
     
-    # 3) 可能被截断：有 { 但没有匹配的 }
-    if start_idx != -1:
-        truncated = content[start_idx:]
+    # 3) 尝试提取 JSON 数组 [...]
+    arr_start = content.find('[')
+    arr_end = content.rfind(']')
+    
+    if arr_start != -1 and arr_end != -1 and arr_end > arr_start:
+        json_str = content[arr_start:arr_end + 1]
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+    
+    # 4) 可能被截断：有 { 或 [ 但没有匹配的闭合符号
+    first_open = -1
+    for ch_idx, ch in enumerate(content):
+        if ch in ('{', '['):
+            first_open = ch_idx
+            break
+    
+    if first_open != -1:
+        truncated = content[first_open:]
         repaired = _try_repair_json(truncated)
         if repaired is not None:
             logger.info(f"成功修复截断的 JSON (model={model_name})")
@@ -78,11 +106,14 @@ def safe_extract_json(raw_content: str, model_name: str = "", fallback: Any = No
         return fallback
 
 
-def _try_repair_json(truncated: str) -> Optional[dict]:
-    """尝试修复被截断的 JSON 字符串"""
+def _try_repair_json(truncated: str) -> Optional[Any]:
+    """尝试修复被截断的 JSON 字符串（支持 object 和 array）"""
     text = truncated.rstrip()
     
-    for suffix in ['', '"', '"}', '"]', '"}]}', '"}}']:
+    # 尝试不同的补全后缀
+    suffixes = ['', '"', '"}', '"]', '"]}', '"}]}', '"}}', 'null}', 'null]']
+    
+    for suffix in suffixes:
         for trim_char in ['', ',']:
             candidate = text
             if trim_char and candidate.endswith(','):

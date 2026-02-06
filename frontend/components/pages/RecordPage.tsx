@@ -22,10 +22,13 @@ export interface FeedItem {
   tags?: string[];
   dimension_scores?: Record<string, number>;
   is_public?: boolean;
+  // 分步处理状态
+  failed_phases?: string[];    // 后端返回的失败阶段列表
   _pending?: boolean;
-  _failed?: boolean;       // 提交失败
-  _errorMsg?: string;      // 错误信息
+  _failed?: boolean;           // 整体提交失败（网络错误等）
+  _errorMsg?: string;          // 错误信息
   _tempImagePreview?: string;
+  _regenerating?: string[];    // 正在重新生成的阶段
 }
 
 interface RecordPageProps {
@@ -39,26 +42,39 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
   // 只有 ID 列表变化才会更新界面
   const [feedIds, setFeedIds] = useState<string[]>([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryContent, setRetryContent] = useState<{ text: string; imagePreview: string | null } | null>(null);
   const { showToast } = useToast();
 
   // 获取历史记录
   const fetchHistory = useCallback(async () => {
     try {
+      setLoadError(null);
       const response = await fetch('/api/feed/history?limit=50');
       if (response.ok) {
         const data: FeedItem[] = await response.json();
-        // 重置 Map 和 ID 列表
+        // 重置 Map 和 ID 列表（保留未完成的 temp 项）
         const newMap = new Map<string, FeedItem>();
         const newIds: string[] = [];
+        // 先保留 pending/failed 的 temp 项
+        feedDataRef.current.forEach((item, id) => {
+          if (id.startsWith('temp-')) {
+            newMap.set(id, item);
+            newIds.push(id);
+          }
+        });
         data.forEach(item => {
           newMap.set(item.id, item);
           newIds.push(item.id);
         });
         feedDataRef.current = newMap;
         setFeedIds(newIds);
+      } else {
+        setLoadError(`加载失败 (${response.status})`);
       }
     } catch (error) {
       console.error('获取历史记录失败:', error);
+      setLoadError('网络错误，请检查连接');
     } finally {
       setIsFirstLoad(false);
     }
@@ -103,6 +119,8 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     image_saved?: boolean;
     thumbnail_path?: string;
     image_path?: string;
+    failed_phases?: string[];
+    dimension_scores?: Record<string, number>;
   }) => {
     // 找到临时项，获取原始输入内容
     let originalContent: string | null = null;
@@ -132,9 +150,11 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
       ai_insight: finalInsight,
       created_at: response.created_at,
       tags: response.tags,
+      dimension_scores: response.dimension_scores,
       image_saved: response.image_saved,
       thumbnail_path: response.thumbnail_path,
       image_path: response.image_path,
+      failed_phases: response.failed_phases?.length ? response.failed_phases : undefined,
     };
     
     // 找到临时 ID 并替换
@@ -155,12 +175,21 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
       return [response.id, ...prev];
     });
     
-    // Toast 也用有意义的内容
-    const toastMessage = isGenericInsight ? '记录成功！' : response.ai_insight;
-    showToast('success', toastMessage);
+    // Toast 提示
+    if (response.failed_phases?.length) {
+      const phaseNames: Record<string, string> = {
+        tags: '标签', dimension_scores: '维度评分', ai_insight: 'AI 洞察',
+        image_save: '图片保存', rag_index: '搜索索引',
+      };
+      const failedNames = response.failed_phases.map(p => phaseNames[p] || p).join('、');
+      showToast('success', `记录已保存，${failedNames}生成失败（可点击重试）`);
+    } else {
+      const toastMessage = isGenericInsight ? '记录成功！' : response.ai_insight;
+      showToast('success', toastMessage);
+    }
   }, [showToast, feedIds]);
 
-  // 处理失败：将临时记录标记为失败状态（而不是直接移除）
+  // 处理失败：将临时记录标记为失败状态（保留在列表中，不自动消失）
   const handleFeedError = useCallback((errorMsg?: string) => {
     setFeedIds(prev => {
       const tempIds = prev.filter(id => id.startsWith('temp-'));
@@ -178,19 +207,86 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
       // 触发重渲染
       return [...prev];
     });
-    showToast('error', errorMsg || '记录失败，内容已恢复，点击发送重试');
-    
-    // 5秒后移除失败的临时记录
-    setTimeout(() => {
-      setFeedIds(prev => {
-        const failedIds = prev.filter(id => {
-          const item = feedDataRef.current.get(id);
-          return item?._failed;
-        });
-        failedIds.forEach(id => feedDataRef.current.delete(id));
-        return prev.filter(id => !failedIds.includes(id));
+    showToast('error', errorMsg || '记录失败，可点击重试');
+  }, [showToast]);
+
+  // 取消/移除失败的记录
+  const handleDismissFailed = useCallback((id: string) => {
+    feedDataRef.current.delete(id);
+    setFeedIds(prev => prev.filter(i => i !== id));
+  }, []);
+
+  // 重试失败的记录（重新提交到输入框）
+  const handleRetryFailed = useCallback((id: string) => {
+    const item = feedDataRef.current.get(id);
+    if (!item) return;
+    // 移除失败的临时项
+    feedDataRef.current.delete(id);
+    setFeedIds(prev => prev.filter(i => i !== id));
+    // 将内容恢复到输入框（通过设置 retryContent 让 MagicInputBar 读取）
+    setRetryContent({
+      text: item.raw_content || '',
+      imagePreview: item._tempImagePreview || null,
+    });
+  }, []);
+
+  // 重新生成已保存记录中失败的部分
+  const handleRegenerate = useCallback(async (id: string, phases: string[]) => {
+    // 标记正在重新生成
+    const item = feedDataRef.current.get(id);
+    if (item) {
+      feedDataRef.current.set(id, { ...item, _regenerating: phases });
+      setFeedIds(prev => [...prev]);
+    }
+
+    try {
+      const token = localStorage.getItem('vibingu_token');
+      const controller = new AbortController();
+      // 120秒超时（重新生成阶段较少，但AI调用仍需时间）
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      const res = await fetch(`/api/feed/${id}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ phases }),
+        signal: controller.signal,
       });
-    }, 5000);
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error('重新生成请求失败');
+      }
+
+      const data = await res.json();
+      const current = feedDataRef.current.get(id);
+      if (current) {
+        const updated = { ...current, _regenerating: undefined };
+        if (data.tags !== null && data.tags !== undefined) updated.tags = data.tags;
+        if (data.dimension_scores !== null && data.dimension_scores !== undefined) updated.dimension_scores = data.dimension_scores;
+        if (data.ai_insight !== null && data.ai_insight !== undefined) updated.ai_insight = data.ai_insight;
+        updated.failed_phases = data.failed_phases?.length ? data.failed_phases : undefined;
+        feedDataRef.current.set(id, updated);
+        setFeedIds(prev => [...prev]);
+      }
+
+      if (data.failed_phases?.length) {
+        showToast('error', '部分内容仍然生成失败，可稍后再试');
+      } else {
+        showToast('success', '重新生成成功！');
+      }
+    } catch (err) {
+      // 恢复状态
+      const current = feedDataRef.current.get(id);
+      if (current) {
+        feedDataRef.current.set(id, { ...current, _regenerating: undefined });
+        setFeedIds(prev => [...prev]);
+      }
+      showToast('error', '重新生成失败，请稍后重试');
+    }
   }, [showToast]);
 
   // 删除记录
@@ -260,11 +356,24 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
               <div key={i} className="h-24 bg-[var(--glass-bg)] rounded-2xl animate-pulse" />
             ))}
           </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <p className="text-sm text-red-400">{loadError}</p>
+            <button
+              onClick={fetchHistory}
+              className="px-4 py-2 text-sm rounded-xl bg-[var(--accent)] text-white hover:opacity-90 transition-all"
+            >
+              重新加载
+            </button>
+          </div>
         ) : feedItems.length > 0 ? (
           <FeedHistory 
             items={feedItems} 
             onDelete={handleDelete}
             onTogglePublic={handleTogglePublic}
+            onDismissFailed={handleDismissFailed}
+            onRetryFailed={handleRetryFailed}
+            onRegenerate={handleRegenerate}
             showManagement={true}
           />
         ) : (
@@ -280,6 +389,8 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
             onLoading={() => {}}
             onOptimisticAdd={handleOptimisticAdd}
             onError={handleFeedError}
+            retryContent={retryContent}
+            onRetryConsumed={() => setRetryContent(null)}
           />
         </div>
       </div>

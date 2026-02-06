@@ -28,5 +28,25 @@ class FeedResponse(BaseModel):
     tags: Optional[List[str]] = None
     dimension_scores: Optional[Dict[str, float]] = None
     
+    # v0.3: 分步处理状态 — 标记哪些阶段失败了（前端可按需重试）
+    # 可能的值: "tags", "dimension_scores", "ai_insight", "image_save", "rag_index"
+    failed_phases: List[str] = []
+    
     class Config:
         from_attributes = True
+
+
+class RegenerateRequest(BaseModel):
+    """重新生成请求"""
+    phases: List[str]  # 要重新生成的阶段: "tags", "dimension_scores", "ai_insight"
+
+
+class RegenerateResponse(BaseModel):
+    """重新生成响应"""
+    id: str
+    # 更新后的字段（只返回有变化的）
+    tags: Optional[List[str]] = None
+    dimension_scores: Optional[Dict[str, float]] = None
+    ai_insight: Optional[str] = None
+    # 仍然失败的阶段
+    failed_phases: List[str] = []

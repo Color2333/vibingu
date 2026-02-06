@@ -98,7 +98,7 @@ class ChatAssistant:
             
             # 使用并发控制器
             from app.services.ai_client import _concurrency_limiter
-            acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(self.model, timeout=60.0)
+            acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(self.model, timeout=90.0)
             if not acquired:
                 logger.warning(f"模型 {self.model} 并发已满")
                 return self._fallback_db_only(message)
@@ -169,7 +169,7 @@ class ChatAssistant:
             messages.append({"role": "user", "content": user_prompt})
 
             from app.services.ai_client import _concurrency_limiter
-            acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(self.model, timeout=60.0)
+            acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(self.model, timeout=90.0)
             if not acquired:
                 yield f"data: {_json.dumps({'content': 'AI 模型繁忙，请稍后重试', 'done': True}, ensure_ascii=False)}\n\n"
                 return

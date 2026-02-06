@@ -70,7 +70,7 @@ class ModelConcurrencyLimiter:
                 logger.debug(f"[并发控制] 模型 {model} 并发上限: {limit}")
             return self._semaphores[model]
     
-    async def acquire(self, model: str, timeout: float = 60.0) -> bool:
+    async def acquire(self, model: str, timeout: float = 90.0) -> bool:
         """获取并发许可（阻塞等待直到有空位）
         
         Args:
@@ -88,7 +88,7 @@ class ModelConcurrencyLimiter:
             logger.warning(f"[并发控制] 模型 {model} 等待超时 ({timeout}s)")
             return False
     
-    async def acquire_with_upgrade(self, model: str, timeout: float = 60.0):
+    async def acquire_with_upgrade(self, model: str, timeout: float = 90.0):
         """尝试获取并发许可，flash 模型繁忙时自动升级到付费模型
         
         Returns:
@@ -147,7 +147,7 @@ class AIClient:
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=httpx.Timeout(60.0)
+            timeout=httpx.Timeout(120.0)
         ) if api_key else None
         
         # 模型配置
@@ -216,7 +216,7 @@ class AIClient:
         while total_attempts < max_total_attempts:
             # 获取并发许可，flash 繁忙时自动升级
             acquired, actual_model = await _concurrency_limiter.acquire_with_upgrade(
-                requested_model, timeout=60.0
+                requested_model, timeout=90.0
             )
             if not acquired:
                 raise AIClientError(

@@ -22,7 +22,7 @@ from app.services.image_storage import ImageStorage
 from app.services.tagger import get_tagger
 from app.services.dimension_analyzer import get_dimension_analyzer
 from app.services.gamification import get_gamification_service
-from app.schemas.feed import FeedResponse
+from app.schemas.feed import FeedResponse, RegenerateRequest, RegenerateResponse
 from app.routers.auth import verify_token
 
 # 延迟加载 RAG 服务（避免启动时的循环导入）
@@ -113,6 +113,7 @@ async def create_feed(
     image_path = None
     thumbnail_path = None
     classification_result = None
+    failed_phases: list[str] = []  # 追踪失败的阶段
     
     # ===== Phase 1: 图片分类 =====
     if image:
@@ -132,43 +133,47 @@ async def create_feed(
             should_save_image = classification_result["should_save_image"]
         except Exception as e:
             logger.warning(f"[Phase 1] 图片分类失败，使用默认分类: {e}")
-            # 分类失败，使用默认值，不阻止记录保存
             classification_result = None
             image_type = "other"
-            should_save_image = True  # 保守起见保存原图
+            should_save_image = True
         
-        # 设置输入类型
         if image_type in ["screenshot", "activity_screenshot", "sleep_screenshot"]:
             input_type = InputType.SCREENSHOT.value
         else:
             input_type = InputType.IMAGE.value
-        
     
-    # ===== Phase 2: 数据提取 =====
+    # ===== Phase 2: 数据提取（核心，失败则自动重试一次） =====
     extract_result = {}
-    try:
-        if image_base64:
-            extract_result = await data_extractor.extract(
-                image_type=image_type or "other",
-                image_base64=image_base64,
-                text=text,
-                content_hint=classification_result.get("content_hint") if classification_result else None,
-                client_time=client_time,
-            )
-        else:
-            extract_result = await data_extractor.extract(
-                image_type="other",
-                text=text,
-                client_time=client_time,
-            )
-    except Exception as e:
-        logger.warning(f"[Phase 2] 数据提取失败，使用基础数据: {e}")
-        # 提取失败，用基础数据填充，记录仍然保存
-        extract_result = {
-            "category": category_hint.upper() if category_hint else "MOOD",
-            "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
-            "reply_text": text or "已记录（AI 分析暂时不可用）",
-        }
+    ai_insight_failed = False
+    for attempt in range(2):
+        try:
+            if image_base64:
+                extract_result = await data_extractor.extract(
+                    image_type=image_type or "other",
+                    image_base64=image_base64,
+                    text=text,
+                    content_hint=classification_result.get("content_hint") if classification_result else None,
+                    client_time=client_time,
+                )
+            else:
+                extract_result = await data_extractor.extract(
+                    image_type="other",
+                    text=text,
+                    client_time=client_time,
+                )
+            break  # 成功则跳出重试
+        except Exception as e:
+            if attempt == 0:
+                logger.warning(f"[Phase 2] 数据提取失败，自动重试: {e}")
+            else:
+                logger.warning(f"[Phase 2] 数据提取重试仍失败，使用基础数据: {e}")
+                ai_insight_failed = True
+                failed_phases.append("ai_insight")
+                extract_result = {
+                    "category": category_hint.upper() if category_hint else "MOOD",
+                    "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
+                    "reply_text": text or "已记录（AI 分析暂时不可用）",
+                }
     
     # ===== Phase 3: 存储决策 =====
     if should_save_image and image_base64:
@@ -181,6 +186,7 @@ async def create_feed(
             )
         except Exception as e:
             logger.error(f"[Phase 3] 图片保存失败: {e}")
+            failed_phases.append("image_save")
             image_path = None
             thumbnail_path = None
     
@@ -201,25 +207,32 @@ async def create_feed(
             "should_save": classification_result["should_save_image"],
         }
     
-    # ===== Phase 4: 智能标签生成 =====
+    # ===== Phase 4: 智能标签生成（失败则自动重试一次） =====
     tags = []
-    try:
-        tags = await tagger.generate_tags(
-            text=text,
-            category=category,
-            meta_data=meta_data,
-            record_id=None,
-        )
-    except Exception as e:
-        logger.warning(f"[Phase 4] 标签生成失败: {e}")
-        # 标签失败不影响记录保存
+    for attempt in range(2):
+        try:
+            tags = await tagger.generate_tags(
+                text=text,
+                category=category,
+                meta_data=meta_data,
+                record_id=None,
+            )
+            if tags:
+                break
+        except Exception as e:
+            if attempt == 0:
+                logger.warning(f"[Phase 4] 标签生成失败，自动重试: {e}")
+            else:
+                logger.warning(f"[Phase 4] 标签生成重试仍失败: {e}")
+                failed_phases.append("tags")
+    if not tags and "tags" not in failed_phases:
+        failed_phases.append("tags")
     
     # ===== Phase 5: 八维度评分（LLM 驱动，规则引擎 fallback） =====
     dimension_scores = extract_result.get("dimension_scores")
     if dimension_scores:
         logger.info(f"[Phase 5] 使用 LLM 维度评分: {dimension_scores}")
     else:
-        # LLM 未返回评分，fallback 到规则引擎
         try:
             dimension_scores = dimension_analyzer.calculate_dimension_scores(
                 category=category or "MOOD",
@@ -229,6 +242,7 @@ async def create_feed(
             logger.info(f"[Phase 5] Fallback 到规则引擎评分")
         except Exception as e:
             logger.warning(f"[Phase 5] 维度分析失败: {e}")
+            failed_phases.append("dimension_scores")
             dimension_scores = {}
     
     # 确定记录发生时间
@@ -258,6 +272,9 @@ async def create_feed(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"数据保存失败: {e}")
     
+    if failed_phases:
+        logger.info(f"[结果] 记录已保存 (id={life_stream.id})，部分阶段失败: {failed_phases}")
+    
     # ===== Phase 6: 游戏化奖励 =====
     try:
         gamification = get_gamification_service()
@@ -274,6 +291,7 @@ async def create_feed(
             rag.index_record(life_stream)
     except Exception as e:
         logger.warning(f"[Phase 7] RAG 索引失败: {e}")
+        failed_phases.append("rag_index")
     
     return FeedResponse(
         id=str(life_stream.id),
@@ -287,6 +305,112 @@ async def create_feed(
         thumbnail_path=f"/api/feed/image/{thumbnail_path}" if thumbnail_path else None,
         tags=tags,
         dimension_scores=dimension_scores,
+        failed_phases=failed_phases,
+    )
+
+
+# ========== 重新生成端点 ==========
+
+@router.post("/{record_id}/regenerate", response_model=RegenerateResponse)
+async def regenerate_phases(
+    record_id: str,
+    request: RegenerateRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    """
+    对已保存的记录，按需重新生成失败的部分。
+    
+    支持的 phases: "tags", "dimension_scores", "ai_insight"
+    """
+    record = db.query(LifeStream).filter(
+        LifeStream.id == record_id,
+        LifeStream.is_deleted != True,
+    ).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    still_failed: list[str] = []
+    updated_tags = None
+    updated_scores = None
+    updated_insight = None
+    
+    # 重新生成标签
+    if "tags" in request.phases:
+        try:
+            new_tags = await tagger.generate_tags(
+                text=record.raw_content,
+                category=record.category,
+                meta_data=record.meta_data or {},
+                record_id=record_id,
+            )
+            if new_tags:
+                record.tags = new_tags
+                updated_tags = new_tags
+                logger.info(f"[Regenerate] 标签重新生成成功 (id={record_id}): {new_tags}")
+            else:
+                still_failed.append("tags")
+        except Exception as e:
+            logger.warning(f"[Regenerate] 标签重新生成失败 (id={record_id}): {e}")
+            still_failed.append("tags")
+    
+    # 重新生成维度评分
+    if "dimension_scores" in request.phases:
+        try:
+            new_scores = dimension_analyzer.calculate_dimension_scores(
+                category=record.category or "MOOD",
+                meta_data=record.meta_data or {},
+                tags=record.tags or [],
+            )
+            if new_scores:
+                record.dimension_scores = new_scores
+                updated_scores = new_scores
+                logger.info(f"[Regenerate] 维度评分重新生成成功 (id={record_id})")
+            else:
+                still_failed.append("dimension_scores")
+        except Exception as e:
+            logger.warning(f"[Regenerate] 维度评分重新生成失败 (id={record_id}): {e}")
+            still_failed.append("dimension_scores")
+    
+    # 重新生成 AI 洞察
+    if "ai_insight" in request.phases:
+        try:
+            extract_result = await data_extractor.extract(
+                image_type=record.image_type or "other",
+                text=record.raw_content,
+                client_time=record.created_at.isoformat() if record.created_at else None,
+            )
+            new_insight = extract_result.get("reply_text")
+            if new_insight and new_insight != "已记录":
+                record.ai_insight = new_insight
+                updated_insight = new_insight
+                # 同时更新 meta_data 和 dimension_scores（如果之前也失败了）
+                if extract_result.get("meta_data"):
+                    record.meta_data = extract_result["meta_data"]
+                if extract_result.get("dimension_scores") and not record.dimension_scores:
+                    record.dimension_scores = extract_result["dimension_scores"]
+                    updated_scores = extract_result["dimension_scores"]
+                logger.info(f"[Regenerate] AI 洞察重新生成成功 (id={record_id})")
+            else:
+                still_failed.append("ai_insight")
+        except Exception as e:
+            logger.warning(f"[Regenerate] AI 洞察重新生成失败 (id={record_id}): {e}")
+            still_failed.append("ai_insight")
+    
+    # 保存更新
+    try:
+        db.commit()
+        db.refresh(record)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"更新保存失败: {e}")
+    
+    return RegenerateResponse(
+        id=record_id,
+        tags=updated_tags,
+        dimension_scores=updated_scores,
+        ai_insight=updated_insight,
+        failed_phases=still_failed,
     )
 
 
@@ -630,6 +754,14 @@ async def delete_record(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"删除失败: {e}")
+    
+    # 同步从 RAG 知识库中移除
+    try:
+        rag = get_rag()
+        if rag:
+            rag.remove_record(record_id)
+    except Exception as e:
+        logger.warning(f"删除记录后清除 RAG 索引失败 (id={record_id}): {e}")
     
     return {"success": True, "message": "记录已删除"}
 

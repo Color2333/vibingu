@@ -62,10 +62,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
   }, [toast.duration, onRemove]);
 
   return (
-    <div className="glass rounded-xl px-4 py-3 flex items-center gap-3 animate-scale-in max-w-sm">
+    <div className="rounded-xl px-4 py-3 flex items-center gap-3 animate-scale-in max-w-sm
+                    bg-[#1a1a2e]/95 backdrop-blur-xl
+                    border border-white/10 shadow-lg shadow-black/20">
       {toastIcons[toast.type]}
-      <p className="text-sm text-white/80 flex-1">{toast.message}</p>
-      <button onClick={onRemove} className="text-white/30 hover:text-white/50 transition-colors">
+      <p className="text-sm text-white/90 flex-1">{toast.message}</p>
+      <button onClick={onRemove} className="text-white/40 hover:text-white/60 transition-colors">
         <X className="w-4 h-4" />
       </button>
     </div>

@@ -30,7 +30,7 @@ def test_text_input_flow():
     r = requests.post(
         f"{BASE_URL}/api/feed",
         data={"text": test_content},  # Form 数据，不是 JSON
-        timeout=90  # AI 处理可能需要较长时间
+        timeout=180  # AI 处理含多阶段+自动重试，需要足够时间
     )
     
     if r.status_code != 200:

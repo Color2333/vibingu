@@ -7,14 +7,18 @@ import {
   Image as ImageIcon, X, Users, Briefcase, BookOpen, 
   Gamepad2, Sparkles, Lightbulb, ChevronRight, MessageCircle,
   MoreVertical, Trash2, Globe, Lock, Calendar, XCircle,
-  ScanSearch, Brain, Tag, Check
+  ScanSearch, Brain, Tag, Check, RefreshCw
 } from 'lucide-react';
 import type { FeedItem } from '@/components/pages/RecordPage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface FeedHistoryProps {
   items: FeedItem[];
   onDelete?: (id: string) => void;
   onTogglePublic?: (id: string, isPublic: boolean) => void;
+  onDismissFailed?: (id: string) => void;
+  onRetryFailed?: (id: string) => void;
+  onRegenerate?: (id: string, phases: string[]) => void;
   showManagement?: boolean;
 }
 
@@ -62,6 +66,9 @@ interface TimelineCardProps {
   isLast: boolean;
   onDelete?: (id: string) => void;
   onTogglePublic?: (id: string, isPublic: boolean) => void;
+  onDismissFailed?: (id: string) => void;
+  onRetryFailed?: (id: string) => void;
+  onRegenerate?: (id: string, phases: string[]) => void;
   showManagement?: boolean;
 }
 
@@ -70,6 +77,9 @@ const TimelineCard = memo(function TimelineCard({
   isLast, 
   onDelete, 
   onTogglePublic,
+  onDismissFailed,
+  onRetryFailed,
+  onRegenerate,
   showManagement = false 
 }: TimelineCardProps) {
   const [showImage, setShowImage] = useState(false);
@@ -97,6 +107,7 @@ const TimelineCard = memo(function TimelineCard({
   const config = categoryConfig[category] || categoryConfig.MOOD;
   const isPending = item._pending;
   const isFailed = item._failed;
+  const isRegenerating = !!(item._regenerating && item._regenerating.length > 0);
   const meta = item.meta_data || {};
 
   // ===== 分析阶段动画（与后端实际流程对齐） =====
@@ -227,7 +238,9 @@ const TimelineCard = memo(function TimelineCard({
           ? 'bg-gradient-to-br from-red-500/5 to-orange-500/5 border border-red-500/20 opacity-80'
           : isPending 
             ? 'bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20' 
-            : 'glass-card hover:bg-[var(--glass-bg)] cursor-pointer'
+            : isRegenerating
+              ? 'glass-card border border-amber-500/30 animate-pulse-subtle'
+              : 'glass-card hover:bg-[var(--glass-bg)] cursor-pointer'
       }`}>
         <div className="p-4">
           {/* 头部：时间 + 分类 + 分数 + 操作 */}
@@ -435,11 +448,35 @@ const TimelineCard = memo(function TimelineCard({
               </div>
             )}
             
-            {/* 失败状态 */}
+            {/* 失败状态 — 保留记录，提供重试和取消 */}
             {isFailed && (
-              <div className="flex items-center gap-2 text-sm text-red-400/80">
-                <XCircle className="w-4 h-4" />
-                <span>{item._errorMsg || '发送失败，内容已恢复到输入框'}</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-red-400/80">
+                  <XCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{item._errorMsg || '发送失败'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetryFailed?.(item.id);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    重新发送
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDismissFailed?.(item.id);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    取消
+                  </button>
+                </div>
               </div>
             )}
 
@@ -485,6 +522,67 @@ const TimelineCard = memo(function TimelineCard({
                 <ImageIcon className="w-4 h-4 text-white" />
               </div>
             </button>
+          )}
+
+          {/* 部分失败提示 / 重新生成动画 */}
+          {!isPending && !isFailed && item.failed_phases && item.failed_phases.length > 0 && (
+            <div className={`mt-2 p-2.5 rounded-lg transition-all duration-300 ${
+              isRegenerating 
+                ? 'bg-indigo-500/5 border border-indigo-500/20' 
+                : 'bg-amber-500/5 border border-amber-500/15'
+            }`}>
+              {isRegenerating ? (
+                /* 重新生成中 — 显示分阶段进度动画 */
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin flex-shrink-0" />
+                    <span className="text-xs font-medium text-indigo-400">正在重新生成...</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(item._regenerating || []).map(phase => {
+                      const phaseLabels: Record<string, { label: string; icon: React.ReactNode }> = {
+                        tags: { label: '标签', icon: <Tag className="w-3 h-3" /> },
+                        dimension_scores: { label: '评分', icon: <Sparkles className="w-3 h-3" /> },
+                        ai_insight: { label: 'AI洞察', icon: <Brain className="w-3 h-3" /> },
+                      };
+                      const info = phaseLabels[phase] || { label: phase, icon: <Sparkles className="w-3 h-3" /> };
+                      return (
+                        <span key={phase} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-indigo-500/10 text-indigo-400 animate-pulse">
+                          {info.icon}
+                          {info.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {/* 进度条动画 */}
+                  <div className="h-1 rounded-full bg-indigo-500/10 overflow-hidden">
+                    <div className="h-full bg-indigo-400/60 rounded-full animate-progress-indeterminate" />
+                  </div>
+                </div>
+              ) : (
+                /* 失败状态 — 显示失败项和重试按钮 */
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-400/80 min-w-0">
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">
+                      {item.failed_phases.map(p => 
+                        ({ tags: '标签', dimension_scores: '评分', ai_insight: 'AI洞察', image_save: '图片', rag_index: '索引' }[p] || p)
+                      ).join('、')}未生成
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRegenerate?.(item.id, item.failed_phases!);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    重新生成
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* 底部操作栏 */}
@@ -552,7 +650,11 @@ const TimelineCard = memo(function TimelineCard({
 }, (prevProps, nextProps) => {
   const p = prevProps.item;
   const n = nextProps.item;
-  return p.id === n.id && p._pending === n._pending && p._failed === n._failed && p.ai_insight === n.ai_insight && p.is_public === n.is_public;
+  return p.id === n.id && p._pending === n._pending && p._failed === n._failed 
+    && p.ai_insight === n.ai_insight && p.is_public === n.is_public
+    && p.failed_phases?.length === n.failed_phases?.length
+    && p._regenerating?.length === n._regenerating?.length
+    && p.tags?.length === n.tags?.length;
 });
 
 // ========== 主组件 ==========
@@ -598,6 +700,9 @@ export default function FeedHistory({
   items, 
   onDelete, 
   onTogglePublic,
+  onDismissFailed,
+  onRetryFailed,
+  onRegenerate,
   showManagement = false 
 }: FeedHistoryProps) {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -826,14 +931,18 @@ export default function FeedHistory({
               </div>
               <div className="pl-1 space-y-4">
                 {dayItems.map((item, idx) => (
-                  <TimelineCard 
-                    key={item.id} 
-                    item={item} 
-                    isLast={idx === dayItems.length - 1}
-                    onDelete={onDelete}
-                    onTogglePublic={onTogglePublic}
-                    showManagement={showManagement}
-                  />
+                  <ErrorBoundary key={item.id}>
+                    <TimelineCard 
+                      item={item} 
+                      isLast={idx === dayItems.length - 1}
+                      onDelete={onDelete}
+                      onTogglePublic={onTogglePublic}
+                      onDismissFailed={onDismissFailed}
+                      onRetryFailed={onRetryFailed}
+                      onRegenerate={onRegenerate}
+                      showManagement={showManagement}
+                    />
+                  </ErrorBoundary>
                 ))}
               </div>
             </div>

@@ -108,9 +108,21 @@ class RAGService:
             logger.error(f"索引记录失败: {e}")
             return False
     
+    def remove_record(self, record_id: str) -> bool:
+        """从向量数据库中删除指定记录"""
+        try:
+            self.collection.delete(ids=[str(record_id)])
+            logger.info(f"已从 RAG 索引中删除记录: {record_id}")
+            return True
+        except Exception as e:
+            logger.warning(f"从 RAG 索引删除记录失败 (id={record_id}): {e}")
+            return False
+
     def index_all_records(self, batch_size: int = 100) -> Dict[str, Any]:
-        """索引所有记录"""
-        records = self.db.query(LifeStream).order_by(LifeStream.created_at.desc()).all()
+        """索引所有未删除的记录"""
+        records = self.db.query(LifeStream).filter(
+            LifeStream.is_deleted != True
+        ).order_by(LifeStream.created_at.desc()).all()
         
         indexed = 0
         failed = 0
@@ -133,7 +145,8 @@ class RAGService:
         start_date = datetime.now() - timedelta(days=days)
         
         records = self.db.query(LifeStream).filter(
-            LifeStream.created_at >= start_date
+            LifeStream.created_at >= start_date,
+            LifeStream.is_deleted != True,
         ).all()
         
         indexed = 0

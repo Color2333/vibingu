@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Mic, MicOff, Send, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 // Web Speech API types
@@ -63,9 +63,13 @@ interface MagicInputBarProps {
   onLoading: (loading: boolean) => void;
   onOptimisticAdd?: (data: { text: string; imagePreview: string | null }) => void;
   onError?: (errorMsg?: string) => void;
+  /** 从失败记录重试时，传入要恢复的内容 */
+  retryContent?: { text: string; imagePreview: string | null } | null;
+  /** retryContent 被消费后的回调 */
+  onRetryConsumed?: () => void;
 }
 
-export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError }: MagicInputBarProps) {
+export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError, retryContent, onRetryConsumed }: MagicInputBarProps) {
   const [text, setText] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -73,6 +77,17 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // 从失败记录恢复内容到输入框
+  useEffect(() => {
+    if (retryContent) {
+      setText(retryContent.text);
+      if (retryContent.imagePreview) {
+        setImagePreview(retryContent.imagePreview);
+      }
+      onRetryConsumed?.();
+    }
+  }, [retryContent, onRetryConsumed]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -201,8 +216,8 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
       formData.append('client_time', clientTime);
 
       const controller = new AbortController();
-      // 90秒超时（AI分析可能耗时较长）
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      // 180秒超时（AI分析含多阶段处理+自动重试，需要足够时间）
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
       
       const response = await fetch('/api/feed', {
         method: 'POST',

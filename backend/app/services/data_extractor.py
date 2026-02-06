@@ -545,7 +545,7 @@ class DataExtractor:
         limiter = _get_concurrency_limiter()
         
         # 获取并发许可，繁忙时自动升级到高并发模型
-        acquired, actual_model = await limiter.acquire_with_upgrade(model, timeout=60.0)
+        acquired, actual_model = await limiter.acquire_with_upgrade(model, timeout=90.0)
         if not acquired:
             raise Exception(f"模型 {model} 并发已满，等待超时")
         

@@ -235,6 +235,27 @@ body {
   animation: float 3s ease-in-out infinite;
 }
 
+/* 重新生成时的微弱脉冲 */
+@keyframes pulse-subtle {
+  0%, 100% { border-color: rgba(251, 191, 36, 0.15); }
+  50% { border-color: rgba(99, 102, 241, 0.35); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* 不确定进度条动画 */
+@keyframes progress-indeterminate {
+  0% { width: 0%; margin-left: 0%; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+
+.animate-progress-indeterminate {
+  animation: progress-indeterminate 1.8s ease-in-out infinite;
+}
+
 /* Stagger delays */
 .delay-1 { animation-delay: 0.05s; opacity: 0; }
 .delay-2 { animation-delay: 0.1s; opacity: 0; }
