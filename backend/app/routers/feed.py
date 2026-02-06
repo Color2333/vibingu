@@ -3,13 +3,14 @@ Feed API - 智能多模态数据投喂
 集成三阶段 AI Agent 流程
 """
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, AsyncGenerator
 from pydantic import BaseModel
 import base64
 import os
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ from app.services.dimension_analyzer import get_dimension_analyzer
 from app.services.gamification import get_gamification_service
 from app.schemas.feed import FeedResponse, RegenerateRequest, RegenerateResponse
 from app.routers.auth import verify_token
+from app.routers.settings import get_nickname
 
 # 延迟加载 RAG 服务（避免启动时的循环导入）
 _rag_service = None
@@ -143,6 +145,7 @@ async def create_feed(
             input_type = InputType.IMAGE.value
     
     # ===== Phase 2: 数据提取（核心，失败则自动重试一次） =====
+    nickname = get_nickname(db)
     extract_result = {}
     ai_insight_failed = False
     for attempt in range(2):
@@ -154,12 +157,14 @@ async def create_feed(
                     text=text,
                     content_hint=classification_result.get("content_hint") if classification_result else None,
                     client_time=client_time,
+                    nickname=nickname,
                 )
             else:
                 extract_result = await data_extractor.extract(
                     image_type="other",
                     text=text,
                     client_time=client_time,
+                    nickname=nickname,
                 )
             break  # 成功则跳出重试
         except Exception as e:
@@ -309,6 +314,272 @@ async def create_feed(
     )
 
 
+# ========== SSE 流式进度端点 ==========
+
+def _sse_event(event_type: str, data: dict) -> str:
+    """格式化 SSE 事件"""
+    payload = json.dumps({**data, "type": event_type}, ensure_ascii=False)
+    return f"data: {payload}\n\n"
+
+
+@router.post("/stream")
+async def create_feed_stream(
+    text: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    category_hint: Optional[str] = Form(None),
+    client_time: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    SSE 流式版本的 create_feed — 每完成一个阶段就推送事件给前端。
+    
+    事件类型:
+    - phase: 阶段进度 {"phase": "xxx", "status": "start"|"done"|"error"}
+    - result: 最终结果 (等同于 FeedResponse)
+    - error: 致命错误
+    """
+    if not text and not image:
+        # 对于非流式场景，直接返回错误
+        async def error_gen():
+            yield _sse_event("error", {"message": "请提供文本或图片输入"})
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+    
+    # 预先读取图片（在生成器外部，因为 UploadFile 在生成器内可能已关闭）
+    image_content = None
+    if image:
+        image_content = await image.read()
+        MAX_IMAGE_SIZE = 10 * 1024 * 1024
+        if len(image_content) > MAX_IMAGE_SIZE:
+            async def size_error():
+                yield _sse_event("error", {"message": f"图片大小超过限制（最大 10MB）"})
+            return StreamingResponse(size_error(), media_type="text/event-stream")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        nonlocal db
+        
+        input_type = InputType.TEXT.value
+        image_base64 = None
+        image_type = None
+        should_save_image = False
+        image_path = None
+        thumbnail_path = None
+        classification_result = None
+        failed_phases: list[str] = []
+        
+        # ===== Phase 1: 图片分类 =====
+        if image_content:
+            yield _sse_event("phase", {"phase": "classify", "status": "start", "label": "图片分类"})
+            image_base64 = base64.b64encode(image_content).decode("utf-8")
+            
+            try:
+                classification_result = await image_classifier.classify(
+                    image_base64=image_base64,
+                    text_hint=text or category_hint,
+                )
+                image_type = classification_result["image_type"]
+                should_save_image = classification_result["should_save_image"]
+            except Exception as e:
+                logger.warning(f"[Stream Phase 1] 图片分类失败: {e}")
+                classification_result = None
+                image_type = "other"
+                should_save_image = True
+            
+            if image_type in ["screenshot", "activity_screenshot", "sleep_screenshot"]:
+                input_type = InputType.SCREENSHOT.value
+            else:
+                input_type = InputType.IMAGE.value
+            
+            yield _sse_event("phase", {"phase": "classify", "status": "done"})
+        
+        # ===== Phase 2: 数据提取 =====
+        yield _sse_event("phase", {"phase": "extract", "status": "start", "label": "AI 分析与提取"})
+        nickname = get_nickname(db)
+        extract_result = {}
+        for attempt in range(2):
+            try:
+                if image_base64:
+                    extract_result = await data_extractor.extract(
+                        image_type=image_type or "other",
+                        image_base64=image_base64,
+                        text=text,
+                        content_hint=classification_result.get("content_hint") if classification_result else None,
+                        client_time=client_time,
+                        nickname=nickname,
+                    )
+                else:
+                    extract_result = await data_extractor.extract(
+                        image_type="other",
+                        text=text,
+                        client_time=client_time,
+                        nickname=nickname,
+                    )
+                break
+            except Exception as e:
+                if attempt == 0:
+                    logger.warning(f"[Stream Phase 2] 数据提取失败，自动重试: {e}")
+                    yield _sse_event("phase", {"phase": "extract", "status": "retry"})
+                else:
+                    logger.warning(f"[Stream Phase 2] 重试仍失败: {e}")
+                    failed_phases.append("ai_insight")
+                    extract_result = {
+                        "category": category_hint.upper() if category_hint else "MOOD",
+                        "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
+                        "reply_text": text or "已记录（AI 分析暂时不可用）",
+                    }
+        yield _sse_event("phase", {"phase": "extract", "status": "done"})
+        
+        # ===== Phase 3: 图片存储 =====
+        if should_save_image and image_base64:
+            yield _sse_event("phase", {"phase": "save_image", "status": "start", "label": "保存图片"})
+            try:
+                image_path, thumbnail_path = await image_storage.save_image(
+                    image_base64=image_base64,
+                    image_type=image_type or "other",
+                    compress=True,
+                    create_thumbnail=True,
+                )
+            except Exception as e:
+                logger.error(f"[Stream Phase 3] 图片保存失败: {e}")
+                failed_phases.append("image_save")
+                image_path = None
+                thumbnail_path = None
+            yield _sse_event("phase", {"phase": "save_image", "status": "done"})
+        
+        # 确定分类 & 合并元数据
+        category = extract_result.get("category")
+        if category_hint:
+            try:
+                category = Category(category_hint.upper()).value
+            except ValueError:
+                pass
+        
+        meta_data = extract_result.get("meta_data", {})
+        if classification_result:
+            meta_data["_classification"] = {
+                "image_type": classification_result["image_type"],
+                "confidence": classification_result["confidence"],
+                "should_save": classification_result["should_save_image"],
+            }
+        
+        # ===== Phase 4: 标签生成 =====
+        yield _sse_event("phase", {"phase": "tags", "status": "start", "label": "生成标签"})
+        tags = []
+        for attempt in range(2):
+            try:
+                tags = await tagger.generate_tags(
+                    text=text,
+                    category=category,
+                    meta_data=meta_data,
+                    record_id=None,
+                )
+                if tags:
+                    break
+            except Exception as e:
+                if attempt == 0:
+                    logger.warning(f"[Stream Phase 4] 标签生成失败，重试: {e}")
+                    yield _sse_event("phase", {"phase": "tags", "status": "retry"})
+                else:
+                    logger.warning(f"[Stream Phase 4] 重试仍失败: {e}")
+                    failed_phases.append("tags")
+        if not tags and "tags" not in failed_phases:
+            failed_phases.append("tags")
+        yield _sse_event("phase", {"phase": "tags", "status": "done"})
+        
+        # ===== Phase 5: 维度评分 =====
+        yield _sse_event("phase", {"phase": "score", "status": "start", "label": "维度评分"})
+        dimension_scores = extract_result.get("dimension_scores")
+        if dimension_scores:
+            logger.info(f"[Stream Phase 5] 使用 LLM 维度评分")
+        else:
+            try:
+                dimension_scores = dimension_analyzer.calculate_dimension_scores(
+                    category=category or "MOOD",
+                    meta_data=meta_data,
+                    tags=tags,
+                )
+            except Exception as e:
+                logger.warning(f"[Stream Phase 5] 维度分析失败: {e}")
+                failed_phases.append("dimension_scores")
+                dimension_scores = {}
+        yield _sse_event("phase", {"phase": "score", "status": "done"})
+        
+        # ===== Phase 6: 保存到数据库 =====
+        yield _sse_event("phase", {"phase": "save", "status": "start", "label": "保存记录"})
+        record_time = extract_result.get("record_time")
+        
+        life_stream = LifeStream(
+            input_type=input_type,
+            category=category,
+            raw_content=text or (classification_result.get("content_hint") if classification_result else None),
+            meta_data=meta_data,
+            ai_insight=extract_result.get("reply_text"),
+            image_type=image_type,
+            image_path=image_path,
+            thumbnail_path=thumbnail_path,
+            image_saved=image_path is not None,
+            tags=tags,
+            dimension_scores=dimension_scores,
+            record_time=record_time,
+        )
+        
+        db.add(life_stream)
+        try:
+            db.commit()
+            db.refresh(life_stream)
+        except Exception as e:
+            db.rollback()
+            yield _sse_event("error", {"message": f"数据保存失败: {e}"})
+            return
+        yield _sse_event("phase", {"phase": "save", "status": "done"})
+        
+        # ===== Phase 7: 游戏化 + RAG（后台，不阻塞前端） =====
+        try:
+            gamification = get_gamification_service()
+            gamification.update_streak()
+            gamification.update_challenge_progress(None, category)
+            gamification.check_and_award_badges()
+        except Exception as e:
+            logger.warning(f"[Stream Phase 7] 游戏化更新失败: {e}")
+        
+        try:
+            rag = get_rag()
+            if rag:
+                rag.index_record(life_stream)
+        except Exception as e:
+            logger.warning(f"[Stream Phase 7] RAG 索引失败: {e}")
+            failed_phases.append("rag_index")
+        
+        if failed_phases:
+            logger.info(f"[Stream 结果] 记录已保存 (id={life_stream.id})，部分阶段失败: {failed_phases}")
+        
+        # ===== 最终结果 =====
+        result = {
+            "id": str(life_stream.id),
+            "category": category,
+            "meta_data": meta_data,
+            "ai_insight": extract_result.get("reply_text", "已记录"),
+            "created_at": life_stream.created_at.isoformat() if life_stream.created_at else None,
+            "record_time": (life_stream.record_time or life_stream.created_at).isoformat() if (life_stream.record_time or life_stream.created_at) else None,
+            "image_saved": life_stream.image_saved,
+            "image_path": f"/api/feed/image/{image_path}" if image_path else None,
+            "thumbnail_path": f"/api/feed/image/{thumbnail_path}" if thumbnail_path else None,
+            "tags": tags,
+            "dimension_scores": dimension_scores,
+            "failed_phases": failed_phases,
+        }
+        yield _sse_event("result", result)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁止 Nginx 缓冲
+        },
+    )
+
+
 # ========== 重新生成端点 ==========
 
 @router.post("/{record_id}/regenerate", response_model=RegenerateResponse)
@@ -379,6 +650,7 @@ async def regenerate_phases(
                 image_type=record.image_type or "other",
                 text=record.raw_content,
                 client_time=record.created_at.isoformat() if record.created_at else None,
+                nickname=get_nickname(db),
             )
             new_insight = extract_result.get("reply_text")
             if new_insight and new_insight != "已记录":
@@ -493,6 +765,7 @@ async def get_public_records(
             "image_path": f"/api/feed/image/{r.image_path}" if r.image_path else None,
             "thumbnail_path": f"/api/feed/image/{r.thumbnail_path}" if r.thumbnail_path else None,
             "tags": r.tags,
+            "dimension_scores": r.dimension_scores,
         }
         for r in records
     ]

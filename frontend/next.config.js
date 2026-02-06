@@ -14,6 +14,8 @@ const nextConfig = {
   // lucide-react / recharts tree-shaking 优化
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
+    // 代理超时：AI 处理含多阶段+自动重试，默认 30s 远远不够
+    proxyTimeout: 180_000, // 180 秒
   },
 
   // 生产环境不暴露 source map

@@ -3,8 +3,107 @@
 import ReminderSettings from '@/components/ReminderSettings';
 import TokenUsage from '@/components/TokenUsage';
 import ShareCard from '@/components/ShareCard';
-import { Download, Upload, Trash2, Database } from 'lucide-react';
-import { useState } from 'react';
+import { Download, Upload, Trash2, Database, User, Check, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+
+function NicknameSection() {
+  const [nickname, setNickname] = useState('小菜');
+  const [savedNickname, setSavedNickname] = useState('小菜');
+  const [saving, setSaving] = useState(false);
+
+  // 异步加载当前昵称（不阻塞 UI）
+  useEffect(() => {
+    const token = localStorage.getItem('vibingu_token');
+    if (!token) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000); // 5秒超时
+    fetch('/api/settings', {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.nickname) {
+          setNickname(data.nickname);
+          setSavedNickname(data.nickname);
+        }
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    const token = localStorage.getItem('vibingu_token');
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/settings/nickname', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nickname: nickname.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSavedNickname(data.nickname || '');
+        setNickname(data.nickname || '');
+      }
+    } catch (e) {
+      console.error('保存昵称失败:', e);
+    } finally {
+      setSaving(false);
+    }
+  }, [nickname]);
+
+  const isDirty = nickname.trim() !== (savedNickname || '');
+
+  return (
+    <div className="p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)]">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400">
+          <User className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <label className="text-sm text-[var(--text-primary)] font-medium block mb-1">
+            你的昵称
+          </label>
+          <p className="text-[10px] text-[var(--text-tertiary)]">
+            AI 会用这个称呼和你对话，而不是"用户"
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3">
+        <input
+          type="text"
+          value={nickname}
+          onChange={e => setNickname(e.target.value.slice(0, 20))}
+          placeholder="输入昵称（如：小明）"
+          maxLength={20}
+          className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)]
+                     text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]
+                     focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50
+                     transition-all"
+          onKeyDown={e => { if (e.key === 'Enter' && isDirty) handleSave(); }}
+        />
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || saving}
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+            isDirty
+              ? 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30'
+              : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] cursor-not-allowed'
+          }`}
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          保存
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false);
@@ -38,6 +137,15 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">设置</h1>
         <p className="text-sm text-[var(--text-tertiary)] mt-1">管理你的偏好和数据</p>
       </div>
+
+      {/* 个人信息 */}
+      <section className="animate-fade-in">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">个人信息</h2>
+          <p className="text-xs text-[var(--text-tertiary)] mt-0.5">让 AI 更了解你</p>
+        </div>
+        <NicknameSection />
+      </section>
 
       {/* 提醒设置 */}
       <section className="animate-fade-in">

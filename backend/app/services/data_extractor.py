@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from openai import AsyncOpenAI
 from app.config import get_settings
+from app.services.token_tracker import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -171,9 +172,13 @@ class DataExtractor:
         text: Optional[str] = None,
         content_hint: Optional[str] = None,
         client_time: Optional[str] = None,
+        nickname: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         根据图片类型提取数据 + 深度分析
+        
+        Args:
+            nickname: 用户昵称，AI 回复时用此称呼代替"用户"
         
         Returns:
             {
@@ -182,6 +187,9 @@ class DataExtractor:
                 "reply_text": str
             }
         """
+        # 保存昵称供 _call_ai 使用（线程安全：每次 extract 调用独立设置）
+        self._nickname = nickname
+        
         if not self.client:
             return self._mock_extract(image_type, text, content_hint, client_time)
         
@@ -247,9 +255,10 @@ class DataExtractor:
 - LEISURE: 休闲娱乐
 - SCREEN: 屏幕时间
 
-请以 JSON 格式输出：
+请以 JSON 格式输出（reply_text 必须放在前面优先生成）：
 {{
     "category": "分类",
+    "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【必须】有洞察力。【禁止】返回'已记录'这种空洞回复。",
     "record_time": "事件实际发生时间，ISO格式如 {today_date}T{client_dt.strftime('%H:%M')}:00 或相对时间如'昨天'",
     "mood": "happy/neutral/sad/tired/anxious/excited/calm/etc",
     "note": "简短描述",
@@ -257,7 +266,6 @@ class DataExtractor:
     "suggestions": ["建议1（具体可行）", "建议2（如有必要）"],
     "trend": "up/down/stable（情绪/状态趋势判断）",
     "tags": ["标签1", "标签2", "标签3"],
-    "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【禁止】返回'已记录'这种空洞回复。",
     "dimension_scores": {{"body": 0, "mood": 75, "social": 0, "work": 0, "growth": 0, "meaning": 30, "digital": 0, "leisure": 0}}
 }}
 """ + DIMENSION_SCORING_PROMPT
@@ -303,9 +311,9 @@ class DataExtractor:
     "awake_hours": 0.5,
     "analysis": "深度分析（50-100字）：评估睡眠质量，深睡占比是否达标（建议20-40%），入睡时间是否健康（建议22:00-23:30）等",
     "suggestions": ["具体建议1", "具体建议2"],
+    "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。",
     "trend": "up/down/stable",
     "tags": ["睡眠", "健康"],
-    "reply_text": "一句温暖、有洞察的回复（15-30字），点评睡眠状况或给予建议。【禁止】空洞的'已记录'。",
     "dimension_scores": {{"body": 80, "mood": 65, "social": 0, "work": 0, "growth": 0, "meaning": 20, "digital": 0, "leisure": 0}}
 }}
 """ + DIMENSION_SCORING_PROMPT + """
@@ -364,9 +372,9 @@ class DataExtractor:
     "suggestions": ["具体建议1（如限制某App）", "具体建议2（如设置屏幕时间）"],
     "record_time": "截图数据所属日期时间，ISO格式",
     "trend": "up/down/stable",
+    "reply_text": "一句有洞察的回复（15-30字），指出屏幕使用的关键问题或肯定健康习惯。【禁止】空洞的'已记录'。",
     "health_score": 60,
     "tags": ["屏幕时间", "数字健康"],
-    "reply_text": "一句有洞察的回复（15-30字），指出屏幕使用的关键问题或肯定健康习惯。【禁止】空洞的'已记录'。",
     "dimension_scores": {{"body": 0, "mood": 40, "social": 0, "work": 30, "growth": 0, "meaning": 0, "digital": 60, "leisure": 30}}
 }}
 """ + DIMENSION_SCORING_PROMPT + """
@@ -404,8 +412,8 @@ class DataExtractor:
     "analysis": "深度分析（50-100字）：评估运动强度、心率区间、是否达到训练效果等",
     "suggestions": ["具体建议1", "具体建议2"],
     "trend": "up/down/stable",
-    "tags": ["运动", "健身"],
     "reply_text": "一句有力的鼓励（15-30字），肯定运动成果或激励继续保持。【禁止】空洞的'已记录'。",
+    "tags": ["运动", "健身"],
     "dimension_scores": {{"body": 85, "mood": 70, "social": 0, "work": 0, "growth": 20, "meaning": 30, "digital": 0, "leisure": 40}}
 }}
 """ + DIMENSION_SCORING_PROMPT + """
@@ -453,8 +461,8 @@ class DataExtractor:
     "record_time": "这餐实际发生时间，ISO格式或相对时间如'今天中午'",
     "analysis": "营养分析（50-100字）：评估这餐的营养均衡性、热量是否合适、搭配是否健康等",
     "suggestions": ["具体建议1", "具体建议2"],
-    "tags": ["饮食", "美食"],
     "reply_text": "一句有趣的评价（15-30字），点评这餐的营养或美味程度。【禁止】空洞的'已记录'。",
+    "tags": ["饮食", "美食"],
     "dimension_scores": {{"body": 70, "mood": 60, "social": 0, "work": 0, "growth": 0, "meaning": 20, "digital": 0, "leisure": 30}}
 }}
 """ + DIMENSION_SCORING_PROMPT + """
@@ -503,8 +511,8 @@ class DataExtractor:
     "mood": "happy/neutral/tired/excited/calm/etc",
     "analysis": "深度分析（30-50字）：从照片推测用户状态、情绪、可能在做什么",
     "suggestions": ["如有需要的建议"],
-    "tags": ["标签1", "标签2"],
     "reply_text": "一句温暖、有洞察的回复（15-30字），反映照片传递的情绪或给予鼓励。【禁止】空洞的'已记录'。",
+    "tags": ["标签1", "标签2"],
     "dimension_scores": {{"body": 0, "mood": 70, "social": 0, "work": 0, "growth": 0, "meaning": 30, "digital": 0, "leisure": 50}}
 }}
 """ + DIMENSION_SCORING_PROMPT
@@ -521,6 +529,14 @@ class DataExtractor:
         client_time: Optional[str] = None
     ) -> Dict[str, Any]:
         """调用 AI 接口（带速率限制和重试）"""
+        
+        # 注入用户昵称到 system_prompt
+        nickname = getattr(self, '_nickname', None)
+        if nickname:
+            system_prompt = (
+                f"【重要】用户的昵称是「{nickname}」，在 reply_text 等回复中请用「{nickname}」称呼，"
+                f"不要用'用户'、'你'等泛称。语气亲切自然。\n\n"
+            ) + system_prompt
         
         user_content = []
         
@@ -556,15 +572,46 @@ class DataExtractor:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                max_tokens=6000,
+                max_tokens=4096,
+                # 强制 JSON 输出：消除 markdown 代码块包裹、额外解释文字等问题
+                response_format={"type": "json_object"},
             )
             
-            # 提取 JSON（AI 可能返回 markdown 代码块、额外文本、或截断内容）
-            raw_content = response.choices[0].message.content
+            # 检查 finish_reason 和 token 用量
+            choice = response.choices[0]
+            finish_reason = choice.finish_reason
+            usage = response.usage
+            
+            if usage:
+                logger.info(
+                    f"[Token 用量] model={actual_model}, category={category}, "
+                    f"prompt={usage.prompt_tokens}, completion={usage.completion_tokens}, "
+                    f"total={usage.total_tokens}, finish_reason={finish_reason}"
+                )
+                # 记录到 token_usage 表
+                try:
+                    record_usage(
+                        model=actual_model,
+                        prompt_tokens=usage.prompt_tokens,
+                        completion_tokens=usage.completion_tokens,
+                        task_type="extract_data",
+                        task_description=f"数据提取: {category}",
+                    )
+                except Exception as e:
+                    logger.warning(f"Token 记录失败: {e}")
+            
+            if finish_reason == "length":
+                logger.warning(
+                    f"⚠️ AI 响应被截断 (finish_reason=length)! model={actual_model}, "
+                    f"category={category}, completion_tokens={usage.completion_tokens if usage else '?'}"
+                )
+            
+            raw_content = choice.message.content
             if not raw_content or not raw_content.strip():
-                logger.warning(f"AI 返回空内容 (model={actual_model}, category={category})")
+                logger.warning(f"AI 返回空内容 (model={actual_model}, category={category}, finish_reason={finish_reason})")
                 raise ValueError("AI 返回内容为空")
             
+            # response_format=json_object 保证输出为纯 JSON，但仍用 extract_json 做防御
             from app.services.json_utils import extract_json
             result = extract_json(raw_content, actual_model)
             
@@ -596,10 +643,21 @@ class DataExtractor:
             if record_time_str:
                 record_time = self._parse_record_time(record_time_str, client_time)
             
+            # 确保 reply_text 有意义
+            reply_text = result.get("reply_text", "")
+            if not reply_text or reply_text == "已记录" or len(reply_text.strip()) < 3:
+                logger.warning(f"AI 未返回有意义的 reply_text (got={reply_text!r})，JSON keys={list(result.keys())}")
+                # 使用 analysis 的前 30 字作为 fallback
+                analysis = result.get("analysis") or meta_data.get("analysis")
+                if analysis and isinstance(analysis, str) and len(analysis) > 5:
+                    reply_text = analysis[:50].rstrip("，。、；") + "..."
+                else:
+                    reply_text = "已记录"
+            
             return {
                 "category": category,
                 "meta_data": meta_data,
-                "reply_text": result.get("reply_text", "已记录"),
+                "reply_text": reply_text,
                 "record_time": record_time,
                 "dimension_scores": dimension_scores,
             }
@@ -665,14 +723,18 @@ class DataExtractor:
                 "dimension_scores": None,
             }
         else:
-            # 纯文本或其他
+            # 纯文本或其他 — 给出比"已记录"更有意义的回复
+            note = text or content_hint or "记录"
+            nickname = getattr(self, '_nickname', None)
+            greeting = f"{nickname}，{time_period}好" if nickname else f"{time_period}好"
+            reply = f"{greeting}！你的记录已保存，AI 分析将在 API 配置后可用。"
             return {
                 "category": "MOOD",
                 "meta_data": {
-                    "note": text or content_hint or "记录",
+                    "note": note,
                     "analysis": None,
                     "suggestions": [],
                 },
-                "reply_text": f"已记录。{time_period}好！",
+                "reply_text": reply,
                 "dimension_scores": None,
             }

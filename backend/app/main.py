@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.database import engine, Base
 from app.routers import feed_router, history_router, analytics_router, reports_router, auth_router, tokens_router, tags_router, time_intel_router, predict_router, chat_router, gamification_router, rag_router
 from app.routers.ai_analysis import router as ai_analysis_router
+from app.routers.settings import router as settings_router
 import logging
 
 # 全局日志配置
@@ -127,6 +128,7 @@ app.include_router(chat_router)
 app.include_router(gamification_router)
 app.include_router(rag_router)
 app.include_router(ai_analysis_router)
+app.include_router(settings_router)
 
 
 @app.get("/")

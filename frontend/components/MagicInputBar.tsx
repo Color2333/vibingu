@@ -63,13 +63,15 @@ interface MagicInputBarProps {
   onLoading: (loading: boolean) => void;
   onOptimisticAdd?: (data: { text: string; imagePreview: string | null }) => void;
   onError?: (errorMsg?: string) => void;
+  /** SSE 阶段进度回调 */
+  onPhaseUpdate?: (phase: string, status: string) => void;
   /** 从失败记录重试时，传入要恢复的内容 */
   retryContent?: { text: string; imagePreview: string | null } | null;
   /** retryContent 被消费后的回调 */
   onRetryConsumed?: () => void;
 }
 
-export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError, retryContent, onRetryConsumed }: MagicInputBarProps) {
+export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, onError, onPhaseUpdate, retryContent, onRetryConsumed }: MagicInputBarProps) {
   const [text, setText] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -216,24 +218,77 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
       formData.append('client_time', clientTime);
 
       const controller = new AbortController();
-      // 180秒超时（AI分析含多阶段处理+自动重试，需要足够时间）
+      // 180秒超时
       const timeoutId = setTimeout(() => controller.abort(), 180000);
       
-      const response = await fetch('/api/feed', {
+      // 使用 SSE 流式端点
+      const response = await fetch('/api/feed/stream', {
         method: 'POST',
         body: formData,
         signal: controller.signal,
       });
       
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
+        clearTimeout(timeoutId);
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || '提交失败');
       }
 
-      const data = await response.json();
-      onSuccess(data);
+      // 流式读取 SSE 事件
+      const reader = response.body?.getReader();
+      if (!reader) {
+        clearTimeout(timeoutId);
+        throw new Error('无法读取服务器响应流');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalResult = null;
+      let streamError: string | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 解析 SSE 事件（以 \n\n 分隔）
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || ''; // 最后一段可能不完整，留在 buffer
+        
+        for (const part of parts) {
+          const dataLine = part.trim();
+          if (!dataLine.startsWith('data: ')) continue;
+          
+          try {
+            const event = JSON.parse(dataLine.slice(6));
+            
+            if (event.type === 'phase') {
+              // 通知阶段进度
+              onPhaseUpdate?.(event.phase, event.status);
+            } else if (event.type === 'result') {
+              // 最终结果
+              finalResult = event;
+            } else if (event.type === 'error') {
+              streamError = event.message || '服务器处理失败';
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+      }
+      
+      clearTimeout(timeoutId);
+
+      if (streamError) {
+        throw new Error(streamError);
+      }
+      
+      if (finalResult) {
+        onSuccess(finalResult);
+      } else {
+        throw new Error('服务器未返回结果');
+      }
     } catch (err) {
       console.error(err);
       // 失败时恢复输入内容，方便用户重试

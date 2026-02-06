@@ -29,6 +29,9 @@ export interface FeedItem {
   _errorMsg?: string;          // 错误信息
   _tempImagePreview?: string;
   _regenerating?: string[];    // 正在重新生成的阶段
+  // SSE 实时阶段推送
+  _serverPhase?: string;           // 当前后端正在处理的阶段
+  _completedPhases?: string[];     // 已完成的阶段列表
 }
 
 interface RecordPageProps {
@@ -133,7 +136,9 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     // 判断 ai_insight 是否有意义（不是空洞的"已记录"等）
     const isGenericInsight = !response.ai_insight || 
       response.ai_insight === '已记录' || 
-      response.ai_insight === '已记录。' ||
+      response.ai_insight.startsWith('已记录。') ||
+      response.ai_insight.startsWith('已记录！') ||
+      response.ai_insight.includes('AI 分析暂时不可用') ||
       response.ai_insight.length < 5;
     
     // 如果 AI 没有给出有意义的洞察，使用原始输入
@@ -209,6 +214,32 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     });
     showToast('error', errorMsg || '记录失败，可点击重试');
   }, [showToast]);
+
+  // SSE 阶段进度更新
+  const handlePhaseUpdate = useCallback((phase: string, status: string) => {
+    setFeedIds(prev => {
+      const tempIds = prev.filter(id => id.startsWith('temp-'));
+      if (tempIds.length === 0) return prev;
+      
+      const latestTempId = tempIds[0];
+      const item = feedDataRef.current.get(latestTempId);
+      if (!item) return prev;
+      
+      const completedPhases = [...(item._completedPhases || [])];
+      if (status === 'done' && !completedPhases.includes(phase)) {
+        completedPhases.push(phase);
+      }
+      
+      feedDataRef.current.set(latestTempId, {
+        ...item,
+        _serverPhase: status === 'start' || status === 'retry' ? phase : item._serverPhase,
+        _completedPhases: completedPhases,
+      });
+      
+      // 触发重渲染
+      return [...prev];
+    });
+  }, []);
 
   // 取消/移除失败的记录
   const handleDismissFailed = useCallback((id: string) => {
@@ -389,6 +420,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
             onLoading={() => {}}
             onOptimisticAdd={handleOptimisticAdd}
             onError={handleFeedError}
+            onPhaseUpdate={handlePhaseUpdate}
             retryContent={retryContent}
             onRetryConsumed={() => setRetryContent(null)}
           />

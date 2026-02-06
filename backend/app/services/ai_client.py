@@ -309,12 +309,16 @@ class AIClient:
         model = model or self.models["text_flash"]
         
         async def _call(model: str, **kwargs):
-            response = await self.client.chat.completions.create(
+            create_kwargs = dict(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+            # json_response=True 时，强制 API 返回纯 JSON（避免 markdown 包裹和多余文字）
+            if json_response:
+                create_kwargs["response_format"] = {"type": "json_object"}
+            response = await self.client.chat.completions.create(**create_kwargs)
             return response
         
         response = await self._execute_with_retry(
@@ -325,9 +329,11 @@ class AIClient:
             allow_fallback=allow_fallback,
         )
         
-        content = response.choices[0].message.content or ""
+        choice = response.choices[0]
+        content = choice.message.content or ""
+        finish_reason = choice.finish_reason
         
-        # 记录 Token 使用
+        # 记录 Token 使用 & finish_reason
         if response.usage:
             try:
                 record_usage(
@@ -340,6 +346,12 @@ class AIClient:
                 )
             except Exception as e:
                 logger.warning(f"Token 记录失败: {e}")
+            
+            if finish_reason == "length":
+                logger.warning(
+                    f"⚠️ AI 响应被截断 (finish_reason=length)! task={task_type}, model={model}, "
+                    f"completion_tokens={response.usage.completion_tokens}"
+                )
         
         # 处理 JSON 响应
         if json_response:
@@ -348,6 +360,7 @@ class AIClient:
         return {
             "content": content,
             "model": model,
+            "finish_reason": finish_reason,
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
                 "completion_tokens": response.usage.completion_tokens if response.usage else 0,
@@ -397,11 +410,14 @@ class AIClient:
         ]
         
         async def _call(model: str, **kwargs):
-            response = await self.client.chat.completions.create(
+            create_kwargs = dict(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
             )
+            if json_response:
+                create_kwargs["response_format"] = {"type": "json_object"}
+            response = await self.client.chat.completions.create(**create_kwargs)
             return response
         
         response = await self._execute_with_retry(
@@ -412,9 +428,11 @@ class AIClient:
             allow_fallback=allow_fallback,
         )
         
-        content = response.choices[0].message.content or ""
+        choice = response.choices[0]
+        content = choice.message.content or ""
+        finish_reason = choice.finish_reason
         
-        # 记录 Token 使用
+        # 记录 Token 使用 & finish_reason
         if response.usage:
             try:
                 record_usage(
@@ -427,6 +445,12 @@ class AIClient:
                 )
             except Exception as e:
                 logger.warning(f"Token 记录失败: {e}")
+            
+            if finish_reason == "length":
+                logger.warning(
+                    f"⚠️ AI 响应被截断 (finish_reason=length)! task={task_type}, model={model}, "
+                    f"completion_tokens={response.usage.completion_tokens}"
+                )
         
         # 处理 JSON 响应
         if json_response:
@@ -435,6 +459,7 @@ class AIClient:
         return {
             "content": content,
             "model": model,
+            "finish_reason": finish_reason,
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
                 "completion_tokens": response.usage.completion_tokens if response.usage else 0,

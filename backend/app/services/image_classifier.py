@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Dict, Any
 from openai import AsyncOpenAI
 from app.config import get_settings
+from app.services.token_tracker import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +139,24 @@ class ImageClassifier:
                     {"role": "user", "content": user_content}
                 ],
                 max_tokens=1600,
+                response_format={"type": "json_object"},
             )
             
-            # 提取 JSON（AI 可能返回 markdown 代码块或额外文本）
             content = response.choices[0].message.content
+            
+            # 记录 token 用量
+            if response.usage:
+                try:
+                    record_usage(
+                        model=actual_model,
+                        prompt_tokens=response.usage.prompt_tokens,
+                        completion_tokens=response.usage.completion_tokens,
+                        task_type="classify_image",
+                        task_description="图片分类",
+                    )
+                except Exception as e:
+                    logger.warning(f"Token 记录失败: {e}")
+            
             from app.services.json_utils import extract_json
             result = extract_json(content, actual_model)
             

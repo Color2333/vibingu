@@ -32,17 +32,22 @@ class TokenTracker:
         cost = calculate_cost(model, prompt_tokens, completion_tokens)
         
         # 确定模型类型 (支持 OpenAI 和 智谱AI)
+        # 规则：先判断 embedding → 再判断 flash(免费) → 再判断 v(视觉) → 付费文本
+        model_lower = model.lower()
         model_type = "other"
-        if "glm-4.6v" in model or "gpt-4o-mini" in model:
-            model_type = "vision"     # 视觉模型
-        elif "glm-4.7" in model and "flash" not in model:
-            model_type = "smart"      # 高级文本模型 (付费)
-        elif "glm-4.7-flash" in model or "gpt-3.5" in model:
-            model_type = "text"       # 普通文本模型 (免费)
-        elif "gpt-4o" in model:
-            model_type = "smart"      # OpenAI 高级模型
-        elif "embedding" in model:
-            model_type = "embedding"  # 嵌入模型
+        if "embedding" in model_lower:
+            model_type = "embedding"      # 嵌入模型 (embedding-3, text-embedding-3-small)
+        elif "flash" in model_lower:
+            if "v" in model_lower.split("flash")[0]:
+                model_type = "vision_free" # 免费视觉 (glm-4.6v-flash)
+            else:
+                model_type = "text_free"   # 免费文本 (glm-4.7-flash)
+        elif "4.6v" in model_lower or "4v" in model_lower:
+            model_type = "vision"          # 付费视觉 (glm-4.6v)
+        elif "gpt-4o-mini" in model_lower or "gpt-3.5" in model_lower:
+            model_type = "text"            # 轻量文本 (gpt-4o-mini, gpt-3.5-turbo)
+        elif "gpt-4o" in model_lower or ("glm-4" in model_lower and "flash" not in model_lower):
+            model_type = "smart"           # 高级文本 (gpt-4o, glm-4.7)
         
         usage = TokenUsage(
             model=model,
@@ -80,17 +85,22 @@ class TokenTracker:
         if not records:
             return {
                 "total_tokens": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
                 "total_cost": 0,
                 "request_count": 0,
                 "by_model": {},
+                "by_model_name": {},
                 "by_task": {}
             }
         
         # 聚合统计
         total_tokens = sum(r.total_tokens for r in records)
+        total_prompt = sum(r.prompt_tokens for r in records)
+        total_completion = sum(r.completion_tokens for r in records)
         total_cost = sum(r.estimated_cost for r in records)
         
-        # 按模型统计
+        # 按模型类型统计
         by_model: Dict[str, Dict] = {}
         for r in records:
             if r.model_type not in by_model:
@@ -98,6 +108,18 @@ class TokenTracker:
             by_model[r.model_type]["tokens"] += r.total_tokens
             by_model[r.model_type]["cost"] += r.estimated_cost
             by_model[r.model_type]["count"] += 1
+        
+        # 按具体模型名统计
+        by_model_name: Dict[str, Dict] = {}
+        for r in records:
+            name = r.model or "unknown"
+            if name not in by_model_name:
+                by_model_name[name] = {"tokens": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0, "count": 0, "model_type": r.model_type}
+            by_model_name[name]["tokens"] += r.total_tokens
+            by_model_name[name]["prompt_tokens"] += r.prompt_tokens
+            by_model_name[name]["completion_tokens"] += r.completion_tokens
+            by_model_name[name]["cost"] += r.estimated_cost
+            by_model_name[name]["count"] += 1
         
         # 按任务类型统计
         by_task: Dict[str, Dict] = {}
@@ -110,9 +132,12 @@ class TokenTracker:
         
         return {
             "total_tokens": total_tokens,
+            "prompt_tokens": total_prompt,
+            "completion_tokens": total_completion,
             "total_cost": round(total_cost, 4),
             "request_count": len(records),
             "by_model": by_model,
+            "by_model_name": by_model_name,
             "by_task": by_task
         }
     
@@ -133,6 +158,45 @@ class TokenTracker:
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         month_start = today.replace(day=1)
         return self.get_usage_stats(month_start)
+    
+    def get_recent_records(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """获取最近的 Token 使用记录"""
+        records = (
+            self.db.query(TokenUsage)
+            .order_by(TokenUsage.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        
+        task_labels = {
+            "parse_input": "解析输入",
+            "classify_image": "图片分类",
+            "extract_data": "数据提取",
+            "generate_tags": "生成标签",
+            "generate_insight": "生成洞察",
+            "rag_query": "RAG 查询",
+            "embedding": "向量嵌入",
+            "chat": "AI 对话",
+            "daily_digest": "每日摘要",
+            "score_dimensions": "维度评分",
+            "other": "其他",
+        }
+        
+        return [
+            {
+                "id": r.id,
+                "time": r.created_at.strftime("%m-%d %H:%M") if r.created_at else "",
+                "model": r.model,
+                "model_type": r.model_type,
+                "task": task_labels.get(r.task_type, r.task_type),
+                "task_type": r.task_type,
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "total_tokens": r.total_tokens,
+                "cost": round(r.estimated_cost, 6),
+            }
+            for r in records
+        ]
     
     def get_daily_trend(self, days: int = 30) -> List[Dict[str, Any]]:
         """获取每日用量趋势"""

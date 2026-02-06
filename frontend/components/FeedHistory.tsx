@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, X, Users, Briefcase, BookOpen, 
   Gamepad2, Sparkles, Lightbulb, ChevronRight, MessageCircle,
   MoreVertical, Trash2, Globe, Lock, Calendar, XCircle,
-  ScanSearch, Brain, Tag, Check, RefreshCw
+  Brain, Tag, Check, RefreshCw, Loader2
 } from 'lucide-react';
 import type { FeedItem } from '@/components/pages/RecordPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -110,67 +110,28 @@ const TimelineCard = memo(function TimelineCard({
   const isRegenerating = !!(item._regenerating && item._regenerating.length > 0);
   const meta = item.meta_data || {};
 
-  // ===== 分析阶段动画（与后端实际流程对齐） =====
-  const hasImage = !!item._tempImagePreview || item.input_type === 'IMAGE' || item.input_type === 'SCREENSHOT';
-  const analysisPhases = [
-    { icon: <ScanSearch className="w-3.5 h-3.5" />, label: hasImage ? '图片分类' : '内容识别', duration: 4000 },
-    { icon: <Brain className="w-3.5 h-3.5" />, label: '数据提取与分析', duration: 8000 },
-    { icon: <Tag className="w-3.5 h-3.5" />, label: '生成标签', duration: 4000 },
+  // ===== 分析阶段（后端 SSE 事件映射为 3 个用户可见步骤） =====
+  // 后端 6 阶段 → 前端 3 步：分析 / 标签 / 保存
+  const displaySteps: { key: string; icon: React.ReactNode; label: string; serverPhases: string[] }[] = [
+    { key: 'analyze', icon: <Brain className="w-3.5 h-3.5" />, label: 'AI 分析', serverPhases: ['classify', 'extract'] },
+    { key: 'tags',    icon: <Tag className="w-3.5 h-3.5" />,   label: '生成标签', serverPhases: ['tags'] },
+    { key: 'save',    icon: <Check className="w-3.5 h-3.5" />, label: '保存',     serverPhases: ['save_image', 'score', 'save'] },
   ];
-  
-  const [currentPhase, setCurrentPhase] = useState(0);
-  const [phaseProgress, setPhaseProgress] = useState(0);
-  
-  useEffect(() => {
-    if (!isPending) {
-      setCurrentPhase(0);
-      setPhaseProgress(0);
-      return;
-    }
-    
-    let phaseIdx = 0;
-    let progressTimer: ReturnType<typeof setInterval>;
-    let phaseTimer: ReturnType<typeof setTimeout>;
-    
-    const startPhase = (idx: number) => {
-      if (idx >= analysisPhases.length) {
-        // 所有阶段完成，循环重新开始
-        startPhase(0);
-        return;
-      }
-      
-      phaseIdx = idx;
-      setCurrentPhase(idx);
-      setPhaseProgress(0);
-      
-      const duration = analysisPhases[idx].duration;
-      const step = 50; // 每50ms更新一次进度
-      const increment = (step / duration) * 100;
-      let progress = 0;
-      
-      progressTimer = setInterval(() => {
-        progress += increment;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(progressTimer);
-        }
-        setPhaseProgress(Math.min(progress, 100));
-      }, step);
-      
-      phaseTimer = setTimeout(() => {
-        clearInterval(progressTimer);
-        startPhase(idx + 1);
-      }, duration);
-    };
-    
-    startPhase(0);
-    
-    return () => {
-      clearInterval(progressTimer);
-      clearTimeout(phaseTimer);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPending]);
+
+  const serverPhase = item._serverPhase;
+  const completedPhases = item._completedPhases || [];
+  const hasServerPhases = isPending && (!!serverPhase || completedPhases.length > 0);
+
+  // 计算每个 displayStep 的状态
+  const stepStatus = displaySteps.map(step => {
+    const allDone = step.serverPhases.every(p => completedPhases.includes(p));
+    const anyActive = step.serverPhases.includes(serverPhase || '');
+    return { ...step, done: allDone, active: anyActive && !allDone };
+  });
+  const doneCount = stepStatus.filter(s => s.done).length;
+  const progressPercent = hasServerPhases ? (doneCount / displaySteps.length) * 100 : 0;
+  // 当前显示阶段
+  const currentStep = stepStatus.find(s => s.active) || stepStatus.find(s => !s.done);
 
   // 动画效果
   useEffect(() => {
@@ -220,7 +181,10 @@ const TimelineCard = memo(function TimelineCard({
             <X className="w-4 h-4 text-red-400" />
           ) : isPending ? (
             <span className="text-indigo-400 animate-pulse">
-              {analysisPhases[currentPhase]?.icon || <Sparkles className="w-4 h-4" />}
+              {hasServerPhases
+                ? (currentStep?.icon || <Sparkles className="w-4 h-4" />)
+                : <Loader2 className="w-4 h-4 animate-spin" />
+              }
             </span>
           ) : (
             <span className={config.color}>{config.icon}</span>
@@ -252,7 +216,11 @@ const TimelineCard = memo(function TimelineCard({
                 {formatTime(item.record_time || item.created_at)}
               </span>
               <span className={`text-xs font-medium ${isFailed ? 'text-red-400' : isPending ? 'text-indigo-400' : config.color}`}>
-                {isFailed ? '发送失败' : isPending ? `${analysisPhases[currentPhase]?.label || '分析中'}...` : config.label}
+                {isFailed ? '发送失败' : isPending ? (
+                  hasServerPhases
+                    ? `${currentStep?.label || '处理中'}...`
+                    : '连接服务器...'
+                ) : config.label}
               </span>
               {/* 公开标签 */}
               {!isPending && item.is_public && (
@@ -397,53 +365,42 @@ const TimelineCard = memo(function TimelineCard({
               return null;
             })()}
             
-            {/* Pending 状态 - 分阶段动画 */}
+            {/* Pending 状态 — 3 步进度 */}
             {isPending && (
-              <div className="space-y-2.5">
-                {/* 阶段步骤条 */}
-                <div className="flex items-center gap-1">
-                  {analysisPhases.map((phase, idx) => (
-                    <div key={idx} className="flex items-center gap-1">
-                      {/* 步骤圆点 */}
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
-                        idx < currentPhase
-                          ? 'bg-indigo-500/30 text-indigo-300'
-                          : idx === currentPhase
-                            ? 'bg-indigo-500/20 text-indigo-400 ring-2 ring-indigo-400/30 ring-offset-1 ring-offset-transparent'
+              <div className="space-y-2">
+                {/* 步骤条：3 步横排 */}
+                <div className="flex items-center gap-1.5">
+                  {stepStatus.map((step, idx) => (
+                    <div key={step.key} className="flex items-center gap-1.5 flex-1">
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-500 whitespace-nowrap ${
+                        step.done
+                          ? 'bg-indigo-500/15 text-indigo-300'
+                          : step.active
+                            ? 'bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-400/30'
                             : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)]'
                       }`}>
-                        {idx < currentPhase ? (
+                        {step.done ? (
                           <Check className="w-3 h-3" />
+                        ) : step.active ? (
+                          <span className="animate-pulse">{step.icon}</span>
                         ) : (
-                          <span className="text-[8px] font-bold">{idx + 1}</span>
+                          <span className="opacity-40">{step.icon}</span>
                         )}
+                        {step.label}
                       </div>
-                      {/* 连接线 */}
-                      {idx < analysisPhases.length - 1 && (
-                        <div className="w-4 h-0.5 rounded-full overflow-hidden bg-[var(--glass-bg)]">
-                          <div
-                            className="h-full bg-indigo-400/50 transition-all duration-300 rounded-full"
-                            style={{
-                              width: idx < currentPhase ? '100%' : idx === currentPhase ? `${phaseProgress}%` : '0%'
-                            }}
-                          />
-                        </div>
+                      {idx < stepStatus.length - 1 && (
+                        <div className={`w-3 h-0.5 rounded-full flex-shrink-0 transition-colors duration-500 ${
+                          step.done ? 'bg-indigo-400/40' : 'bg-[var(--glass-bg)]'
+                        }`} />
                       )}
                     </div>
                   ))}
-                </div>
-                
-                {/* 当前阶段详情 */}
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="text-indigo-400 animate-pulse">
-                    {analysisPhases[currentPhase]?.icon}
-                  </div>
-                  <span className="text-indigo-400/80 font-medium">
-                    {analysisPhases[currentPhase]?.label}...
-                  </span>
-                  <span className="text-[var(--text-tertiary)] text-xs">
-                    {currentPhase + 1}/{analysisPhases.length}
-                  </span>
+                  {!hasServerPhases && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-[var(--text-tertiary)] bg-[var(--glass-bg)]">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      连接中
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -654,7 +611,9 @@ const TimelineCard = memo(function TimelineCard({
     && p.ai_insight === n.ai_insight && p.is_public === n.is_public
     && p.failed_phases?.length === n.failed_phases?.length
     && p._regenerating?.length === n._regenerating?.length
-    && p.tags?.length === n.tags?.length;
+    && p.tags?.length === n.tags?.length
+    && p._serverPhase === n._serverPhase
+    && p._completedPhases?.length === n._completedPhases?.length;
 });
 
 // ========== 主组件 ==========

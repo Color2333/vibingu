@@ -114,3 +114,46 @@ async def get_usage_by_task(
         "period": period,
         "by_task": stats.get("by_task", {})
     }
+
+
+@router.get("/recent")
+async def get_recent_records(
+    limit: int = Query(20, ge=1, le=100, description="返回条数")
+):
+    """获取最近的 Token 使用记录"""
+    tracker = get_tracker()
+    records = tracker.get_recent_records(limit)
+    return {"records": records}
+
+
+@router.get("/detailed-summary")
+async def get_detailed_summary():
+    """获取增强版用量概览（含 prompt/completion 拆分、按任务、按模型、最近记录）"""
+    tracker = get_tracker()
+
+    today_stats = tracker.get_today_stats()
+    week_stats = tracker.get_week_stats()
+    month_stats = tracker.get_month_stats()
+
+    # 最近 10 条记录
+    recent = tracker.get_recent_records(10)
+
+    def fmt(stats: dict) -> dict:
+        return {
+            "tokens": stats["total_tokens"],
+            "prompt_tokens": stats.get("prompt_tokens", 0),
+            "completion_tokens": stats.get("completion_tokens", 0),
+            "cost": stats["total_cost"],
+            "requests": stats["request_count"],
+            "avg_tokens": round(stats["total_tokens"] / max(stats["request_count"], 1)),
+        }
+
+    return {
+        "today": fmt(today_stats),
+        "week": fmt(week_stats),
+        "month": fmt(month_stats),
+        "month_by_model": month_stats.get("by_model", {}),
+        "month_by_model_name": month_stats.get("by_model_name", {}),
+        "month_by_task": month_stats.get("by_task", {}),
+        "recent": recent,
+    }
