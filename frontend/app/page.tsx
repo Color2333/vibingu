@@ -24,7 +24,7 @@ export default function Home() {
   const { isAuthenticated, isLoading: authLoading, login, logout } = useAuth();
 
   // 记录已经挂载过的页面（keep-alive 用）
-  const mountedPages = useRef<Set<PageId>>(new Set(['record']));
+  const mountedPages = useRef<Set<PageId>>(new Set<PageId>(['record']));
 
   const handlePageChange = useCallback((page: PageId) => {
     setCurrentPage(page);
