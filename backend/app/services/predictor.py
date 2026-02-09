@@ -24,6 +24,15 @@ from sqlalchemy import and_
 from app.database import SessionLocal
 from app.models import LifeStream, DailySummary
 
+
+def _matches_cat(record, cat: str) -> bool:
+    """检查记录是否匹配分类（主分类或副分类）"""
+    if record.category == cat:
+        return True
+    if record.sub_categories and cat in record.sub_categories:
+        return True
+    return False
+
 logger = logging.getLogger(__name__)
 
 
@@ -443,7 +452,7 @@ class Predictor:
         
         # 检查饮食中的咖啡因
         for r in records:
-            if r.category == "DIET" and r.meta_data:
+            if _matches_cat(r, "DIET") and r.meta_data:
                 caffeine = r.meta_data.get("caffeine_mg", 0)
                 if caffeine and r.created_at.hour >= 14:
                     factors.append({"type": "caffeine", "status": "late_intake", "impact": "negative"})
@@ -581,7 +590,7 @@ class Predictor:
     
     def _analyze_sleep_impact(self, records, prev_records) -> Optional[Dict]:
         """分析睡眠对当日的影响"""
-        sleep_records = [r for r in prev_records if r.category == "SLEEP"]
+        sleep_records = [r for r in prev_records if _matches_cat(r, "SLEEP")]
         
         if not sleep_records:
             return None
@@ -596,7 +605,7 @@ class Predictor:
     
     def _analyze_diet_impact(self, records) -> Optional[Dict]:
         """分析饮食影响"""
-        diet_records = [r for r in records if r.category == "DIET"]
+        diet_records = [r for r in records if _matches_cat(r, "DIET")]
         
         if not diet_records:
             return None
@@ -610,7 +619,7 @@ class Predictor:
     
     def _analyze_activity_impact(self, records) -> Optional[Dict]:
         """分析运动影响"""
-        activity_records = [r for r in records if r.category == "ACTIVITY"]
+        activity_records = [r for r in records if _matches_cat(r, "ACTIVITY")]
         
         if activity_records:
             return {
@@ -629,7 +638,7 @@ class Predictor:
     
     def _analyze_social_impact(self, records) -> Optional[Dict]:
         """分析社交影响"""
-        social_records = [r for r in records if r.category == "SOCIAL"]
+        social_records = [r for r in records if _matches_cat(r, "SOCIAL")]
         
         if social_records:
             return {
@@ -643,7 +652,7 @@ class Predictor:
     
     def _analyze_screen_impact(self, records) -> Optional[Dict]:
         """分析屏幕时间影响"""
-        screen_records = [r for r in records if r.category == "SCREEN"]
+        screen_records = [r for r in records if _matches_cat(r, "SCREEN")]
         
         if screen_records:
             total_hours = 0

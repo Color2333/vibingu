@@ -267,6 +267,7 @@ async def create_feed(
                 category=category or "MOOD",
                 meta_data=meta_data,
                 tags=tags,
+                sub_categories=extract_result.get("sub_categories") or [],
             )
             logger.info(f"[Phase 5] Fallback 到规则引擎评分")
         except Exception as e:
@@ -277,10 +278,14 @@ async def create_feed(
     # 确定记录发生时间
     record_time = extract_result.get("record_time")
     
+    # 提取副分类
+    sub_categories = extract_result.get("sub_categories") or []
+    
     # 存入数据库
     life_stream = LifeStream(
         input_type=input_type,
         category=category,
+        sub_categories=sub_categories if sub_categories else None,
         raw_content=text or (classification_result.get("content_hint") if classification_result else None),
         meta_data=meta_data,
         ai_insight=extract_result.get("reply_text"),
@@ -325,6 +330,7 @@ async def create_feed(
     return FeedResponse(
         id=str(life_stream.id),
         category=category,
+        sub_categories=sub_categories or [],
         meta_data=meta_data,
         ai_insight=extract_result.get("reply_text", "已记录"),
         created_at=life_stream.created_at,
@@ -544,6 +550,7 @@ async def create_feed_stream(
                     category=category or "MOOD",
                     meta_data=meta_data,
                     tags=tags,
+                    sub_categories=extract_result.get("sub_categories") or [],
                 )
             except Exception as e:
                 logger.warning(f"[Stream Phase 5] 维度分析失败: {e}")
@@ -554,10 +561,12 @@ async def create_feed_stream(
         # ===== Phase 6: 保存到数据库 =====
         yield _sse_event("phase", {"phase": "save", "status": "start", "label": "保存记录"})
         record_time = extract_result.get("record_time")
+        sub_categories = extract_result.get("sub_categories") or []
         
         life_stream = LifeStream(
             input_type=input_type,
             category=category,
+            sub_categories=sub_categories if sub_categories else None,
             raw_content=text or (classification_result.get("content_hint") if classification_result else None),
             meta_data=meta_data,
             ai_insight=extract_result.get("reply_text"),
@@ -604,6 +613,7 @@ async def create_feed_stream(
         result = {
             "id": str(life_stream.id),
             "category": category,
+            "sub_categories": sub_categories or [],
             "meta_data": meta_data,
             "ai_insight": extract_result.get("reply_text", "已记录"),
             "created_at": life_stream.created_at.isoformat() if life_stream.created_at else None,
@@ -680,6 +690,7 @@ async def regenerate_phases(
                 category=record.category or "MOOD",
                 meta_data=record.meta_data or {},
                 tags=record.tags or [],
+                sub_categories=record.sub_categories or [],
             )
             if new_scores:
                 record.dimension_scores = new_scores
@@ -766,7 +777,14 @@ async def get_history(
     ).order_by(LifeStream.created_at.desc())
     
     if category:
-        query = query.filter(LifeStream.category == category.upper())
+        cat_upper = category.upper()
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                LifeStream.category == cat_upper,
+                LifeStream.sub_categories.like(f'%"{cat_upper}"%'),
+            )
+        )
     
     if bookmarked is not None:
         query = query.filter(LifeStream.is_bookmarked == bookmarked)
@@ -816,6 +834,7 @@ async def get_history(
             "dimension_scores": r.dimension_scores,
             "is_public": r.is_public or False,
             "is_bookmarked": r.is_bookmarked or False,
+            "sub_categories": r.sub_categories or [],
         }
         for r in records
     ]
@@ -853,6 +872,7 @@ async def get_public_records(
             "thumbnail_path": f"/api/feed/image/{r.thumbnail_path}" if r.thumbnail_path else None,
             "tags": r.tags,
             "dimension_scores": r.dimension_scores,
+            "sub_categories": r.sub_categories or [],
         }
         for r in records
     ]
@@ -890,6 +910,10 @@ async def get_public_stats(db: Session = Depends(get_db)):
     
     for r in records:
         category_count[r.category] += 1
+        # 副分类也计入统计
+        if r.sub_categories:
+            for sc in r.sub_categories:
+                category_count[sc] += 1
         
         # 日期统计
         if r.record_time:
@@ -1006,6 +1030,7 @@ async def get_record_detail(
         "dimension_scores": record.dimension_scores,
         "is_public": record.is_public or False,
         "is_bookmarked": record.is_bookmarked or False,
+        "sub_categories": record.sub_categories or [],
     }
 
 
@@ -1031,9 +1056,10 @@ async def chat_with_record(
     
     # 构建记录上下文
     actual_time = record.record_time or record.created_at
+    sub_cats_str = f" (副分类: {', '.join(record.sub_categories)})" if record.sub_categories else ""
     record_context = f"""
 这是一条生活记录的详情：
-- 分类: {record.category}
+- 分类: {record.category}{sub_cats_str}
 - 发生时间: {actual_time.strftime('%Y-%m-%d %H:%M') if actual_time else '未知'}
 - 提交时间: {record.created_at.strftime('%Y-%m-%d %H:%M') if record.created_at else '未知'}
 - 原始内容: {record.raw_content or '无'}
@@ -1199,6 +1225,7 @@ class RecordUpdate(BaseModel):
     """通用记录编辑请求"""
     raw_content: Optional[str] = None
     category: Optional[str] = None
+    sub_categories: Optional[List[str]] = None
     record_time: Optional[str] = None
     tags: Optional[List[str]] = None
 
@@ -1227,6 +1254,10 @@ async def update_record(
     
     if update.category is not None:
         record.category = update.category.upper()
+    
+    if update.sub_categories is not None:
+        valid_cats = {"SLEEP", "DIET", "ACTIVITY", "MOOD", "SOCIAL", "WORK", "GROWTH", "LEISURE", "SCREEN"}
+        record.sub_categories = [sc.upper() for sc in update.sub_categories if sc.upper() in valid_cats and sc.upper() != record.category]
     
     if update.record_time is not None:
         from datetime import datetime as dt
@@ -1260,6 +1291,7 @@ async def update_record(
             "id": str(record.id),
             "raw_content": record.raw_content,
             "category": record.category,
+            "sub_categories": record.sub_categories or [],
             "record_time": record.record_time.isoformat() if record.record_time else None,
             "tags": record.tags,
         }

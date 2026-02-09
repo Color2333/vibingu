@@ -200,10 +200,12 @@ const TimelineCard = memo(function TimelineCard({
     return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // 副分类
-  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
-    sc => sc !== category && categoryConfig[sc]
-  ) || [];
+  // 副分类：优先使用顶层字段，fallback 到 meta_data
+  const subCategories = (
+    (item.sub_categories && item.sub_categories.length > 0)
+      ? item.sub_categories
+      : (meta.sub_categories as string[] | undefined)
+  )?.filter(sc => sc !== category && categoryConfig[sc]) || [];
 
   // 解析数据
   const analysis = meta.analysis as string | undefined;
@@ -843,9 +845,12 @@ export default function FeedHistory({
   const filtered = useMemo(() => {
     let result = items;
     
-    // 分类过滤
+    // 分类过滤（同时匹配主分类和副分类）
     if (categoryFilter) {
-      result = result.filter(i => i.category === categoryFilter);
+      result = result.filter(i => 
+        i.category === categoryFilter || 
+        (i.sub_categories && i.sub_categories.includes(categoryFilter))
+      );
     }
     
     // 时间过滤（预设 + 自定义日期范围）

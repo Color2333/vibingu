@@ -63,6 +63,31 @@ def run_migrations():
             cursor.execute("ALTER TABLE life_stream ADD COLUMN is_bookmarked BOOLEAN DEFAULT 0")
             logger.info("自动迁移: 添加 is_bookmarked 列")
         
+        # 添加 sub_categories 列（v0.5 多分类支持）
+        if "sub_categories" not in columns:
+            cursor.execute("ALTER TABLE life_stream ADD COLUMN sub_categories TEXT")
+            logger.info("自动迁移: 添加 sub_categories 列")
+            
+            # 数据迁移：从 meta_data 提取已有的 sub_categories
+            import json as _json
+            cursor.execute("SELECT id, meta_data FROM life_stream WHERE meta_data IS NOT NULL")
+            migrated = 0
+            for row_id, meta_raw in cursor.fetchall():
+                try:
+                    meta = _json.loads(meta_raw) if isinstance(meta_raw, str) else meta_raw
+                    if meta and isinstance(meta, dict) and "sub_categories" in meta:
+                        sc = meta["sub_categories"]
+                        if isinstance(sc, list) and len(sc) > 0:
+                            cursor.execute(
+                                "UPDATE life_stream SET sub_categories = ? WHERE id = ?",
+                                (_json.dumps(sc), row_id)
+                            )
+                            migrated += 1
+                except Exception:
+                    pass
+            if migrated > 0:
+                logger.info(f"数据迁移: 从 meta_data 提取 sub_categories，共迁移 {migrated} 条记录")
+        
         conn.commit()
         conn.close()
     except Exception as e:

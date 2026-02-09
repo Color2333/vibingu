@@ -99,6 +99,10 @@ class TimeIntelligence:
                 
                 if record.category:
                     category_by_hour[hour][record.category] += 1
+                    # 副分类也计入时段统计
+                    if record.sub_categories:
+                        for sc in record.sub_categories:
+                            category_by_hour[hour][sc] += 1
                 
                 # 计算该记录的综合得分
                 if record.dimension_scores:
@@ -502,6 +506,9 @@ class TimeIntelligence:
             if record.created_at and record.category:
                 hour = record.created_at.hour
                 category_hours[record.category][hour] += 1
+                if record.sub_categories:
+                    for sc in record.sub_categories:
+                        category_hours[sc][hour] += 1
         
         result = {}
         for category, hours in category_hours.items():
@@ -802,13 +809,14 @@ class TimeIntelligence:
                     daily_data[date_key]["scores"].append(avg)
                 
                 if record.category:
-                    daily_data[date_key]["categories"].append(record.category)
+                    all_cats = [record.category] + (record.sub_categories or [])
+                    daily_data[date_key]["categories"].extend(all_cats)
                     
-                    if record.category == "SLEEP":
+                    if "SLEEP" in all_cats:
                         daily_data[date_key]["sleep_recorded"] = True
-                    elif record.category == "ACTIVITY":
+                    if "ACTIVITY" in all_cats:
                         daily_data[date_key]["exercise_recorded"] = True
-                    elif record.category == "SOCIAL":
+                    if "SOCIAL" in all_cats:
                         daily_data[date_key]["social_recorded"] = True
                 
                 if hour < 8:

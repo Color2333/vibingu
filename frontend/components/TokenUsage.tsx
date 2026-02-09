@@ -110,17 +110,25 @@ const modelNameConfig: Record<string, { short: string; color: string; free: bool
 };
 
 const taskTypeLabels: Record<string, { label: string; icon: string }> = {
-  parse_input:      { label: '解析输入',  icon: '📋' },
-  classify_image:   { label: '图片分类',  icon: '🖼️' },
-  extract_data:     { label: '数据提取',  icon: '🔍' },
-  generate_tags:    { label: '生成标签',  icon: '🏷️' },
-  generate_insight: { label: '生成洞察',  icon: '💡' },
-  rag_query:        { label: 'RAG 查询', icon: '📚' },
-  embedding:        { label: '向量嵌入',  icon: '🔗' },
-  chat:             { label: 'AI 对话',   icon: '💬' },
-  daily_digest:     { label: '每日摘要',  icon: '📰' },
-  score_dimensions: { label: '维度评分',  icon: '📊' },
-  other:            { label: '其他',      icon: '⚙️' },
+  parse_input:       { label: '解析输入',   icon: '📋' },
+  classify_image:    { label: '图片分类',   icon: '🖼️' },
+  extract_data:      { label: '数据提取',   icon: '🔍' },
+  generate_tags:     { label: '生成标签',   icon: '🏷️' },
+  generate_insight:  { label: '生成洞察',   icon: '💡' },
+  rag_query:         { label: '知识检索',   icon: '📚' },
+  embedding:         { label: '向量嵌入',   icon: '🔗' },
+  chat:              { label: 'AI 对话',    icon: '💬' },
+  record_chat:       { label: '记录对话',   icon: '💬' },
+  daily_digest:      { label: '每日摘要',   icon: '📰' },
+  score_dimensions:  { label: '维度评分',   icon: '📊' },
+  time_analysis:     { label: '时间分析',   icon: '🕐' },
+  trend_analysis:    { label: '趋势分析',   icon: '📈' },
+  ai_analysis:       { label: 'AI 分析',    icon: '🧠' },
+  predict:           { label: '预测分析',   icon: '🔮' },
+  vibe_calculation:  { label: '状态计算',   icon: '✨' },
+  correlation:       { label: '关联分析',   icon: '🔗' },
+  weekly_report:     { label: '周报生成',   icon: '📑' },
+  other:             { label: '其他',       icon: '⚙️' },
 };
 
 // ========== 组件 ==========

@@ -85,6 +85,9 @@ class LifeStream(Base):
     thumbnail_path = Column(String(255), nullable=True, comment="缩略图路径")
     image_saved = Column(Boolean, default=False, comment="是否保存了原图")
     
+    # 副分类（混合类型记录）
+    sub_categories = Column(JSONType, nullable=True, comment="副分类数组")
+    
     # 智能标签
     tags = Column(JSONType, nullable=True, comment="AI生成的标签数组")
     

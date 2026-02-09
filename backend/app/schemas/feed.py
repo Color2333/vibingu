@@ -14,6 +14,7 @@ class FeedResponse(BaseModel):
     """投喂响应"""
     id: str
     category: Optional[str] = None
+    sub_categories: Optional[List[str]] = None
     meta_data: Optional[Dict[str, Any]] = None
     ai_insight: str
     created_at: datetime

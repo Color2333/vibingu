@@ -173,8 +173,16 @@ async def get_correlations(
     
     correlations = []
     
+    def _matches_category(r, cat: str) -> bool:
+        """检查记录是否匹配分类（主分类或副分类）"""
+        if r.category == cat:
+            return True
+        if r.sub_categories and cat in r.sub_categories:
+            return True
+        return False
+    
     # 分析咖啡因摄入
-    diet_records = [r for r in records if r.category == "DIET"]
+    diet_records = [r for r in records if _matches_category(r, "DIET")]
     total_caffeine = 0
     late_caffeine = False
     
@@ -202,7 +210,7 @@ async def get_correlations(
         ))
     
     # 分析屏幕时间
-    screen_records = [r for r in records if r.category == "SCREEN"]
+    screen_records = [r for r in records if _matches_category(r, "SCREEN")]
     total_screen_hours = 0
     
     for r in screen_records:
@@ -224,7 +232,7 @@ async def get_correlations(
         ))
     
     # 分析活动量
-    activity_records = [r for r in records if r.category == "ACTIVITY"]
+    activity_records = [r for r in records if _matches_category(r, "ACTIVITY")]
     activity_count = len(activity_records)
     
     if activity_count > 0:

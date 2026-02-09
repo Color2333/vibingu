@@ -117,10 +117,17 @@ class VibeCalculator:
         # 旧版权重
         WEIGHTS = {"sleep": 0.40, "diet": 0.25, "screen": 0.20, "activity": 0.15}
         
-        sleep_records = [r for r in records if r.category == "SLEEP"]
-        diet_records = [r for r in records if r.category == "DIET"]
-        screen_records = [r for r in records if r.category == "SCREEN"]
-        activity_records = [r for r in records if r.category == "ACTIVITY"]
+        def _cat_match(r, cat):
+            if r.category == cat:
+                return True
+            if r.sub_categories and cat in r.sub_categories:
+                return True
+            return False
+        
+        sleep_records = [r for r in records if _cat_match(r, "SLEEP")]
+        diet_records = [r for r in records if _cat_match(r, "DIET")]
+        screen_records = [r for r in records if _cat_match(r, "SCREEN")]
+        activity_records = [r for r in records if _cat_match(r, "ACTIVITY")]
         
         sleep_score = self._rule_sleep_score(sleep_records)
         diet_score = self._rule_diet_score(diet_records)

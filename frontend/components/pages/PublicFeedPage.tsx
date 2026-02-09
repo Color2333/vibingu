@@ -14,6 +14,7 @@ interface PublicRecord {
   id: string;
   input_type: string;
   category: string;
+  sub_categories?: string[];
   raw_content: string | null;
   meta_data: Record<string, unknown> | null;
   ai_insight: string | null;
@@ -68,9 +69,11 @@ function RecordDetailModal({ record, config, onClose }: {
   onClose: () => void;
 }) {
   const meta = record.meta_data || {};
-  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
-    sc => sc !== record.category && categoryConfig[sc]
-  ) || [];
+  const subCategories = (
+    (record.sub_categories && record.sub_categories.length > 0)
+      ? record.sub_categories
+      : (meta.sub_categories as string[] | undefined)
+  )?.filter(sc => sc !== record.category && categoryConfig[sc]) || [];
   const analysis = meta.analysis as string | undefined;
   const suggestions = meta.suggestions as string[] | undefined;
   const score = (meta.health_score || meta.score) as number | undefined;
@@ -294,7 +297,10 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
 
   const filteredRecords = useMemo(() => {
     if (!selectedCategory) return records;
-    return records.filter(r => r.category === selectedCategory);
+    return records.filter(r => 
+      r.category === selectedCategory || 
+      (r.sub_categories && r.sub_categories.includes(selectedCategory))
+    );
   }, [records, selectedCategory]);
 
   // 按日期分组
@@ -494,9 +500,11 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
                     {dayRecords.map((record, idx) => {
                       const config = categoryConfig[record.category] || categoryConfig.MOOD;
                       const meta = record.meta_data || {};
-                      const cardSubCats = (meta.sub_categories as string[] | undefined)?.filter(
-                        sc => sc !== record.category && categoryConfig[sc]
-                      ) || [];
+                      const cardSubCats = (
+                        (record.sub_categories && record.sub_categories.length > 0)
+                          ? record.sub_categories
+                          : (meta.sub_categories as string[] | undefined)
+                      )?.filter(sc => sc !== record.category && categoryConfig[sc]) || [];
                       const analysis = meta.analysis as string | undefined;
                       const score = (meta.health_score || meta.score) as number | undefined;
                       const durationHours = meta.duration_hours as number | undefined;

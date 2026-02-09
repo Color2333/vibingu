@@ -126,12 +126,13 @@ class DimensionAnalyzer:
         self,
         category: str,
         meta_data: Optional[Dict] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
+        sub_categories: Optional[List[str]] = None
     ) -> Dict[str, float]:
         """
         规则引擎评分（LLM 未返回时的 fallback）
         
-        策略：基于分类给主维度基础分 → 次要维度小幅加分 → 元数据微调
+        策略：基于分类给主维度基础分 → 副分类补充分 → 次要维度小幅加分 → 元数据微调
         """
         scores = {dim: 0.0 for dim in DIMENSIONS.keys()}
         
@@ -139,6 +140,16 @@ class DimensionAnalyzer:
         primary_dim = CATEGORY_TO_DIMENSION.get(category)
         if primary_dim:
             scores[primary_dim] = 65  # 基础分
+        
+        # 1.5 副分类补充分（每个副分类给对应维度 30 分）
+        if sub_categories:
+            for sc in sub_categories:
+                sc_dim = CATEGORY_TO_DIMENSION.get(sc)
+                if sc_dim and scores[sc_dim] < 30:
+                    scores[sc_dim] = 30
+                # 副分类的次要维度也加一点
+                for dim, bonus in CATEGORY_SECONDARY.get(sc, {}).items():
+                    scores[dim] += bonus * 0.5
         
         # 2. 次要维度加分
         for dim, bonus in CATEGORY_SECONDARY.get(category, {}).items():

@@ -319,9 +319,12 @@ class AIAnalyzer:
         }
         
         for r in records:
-            # 分类统计
+            # 分类统计（包含副分类）
             if r.category:
                 summary["categories"][r.category] += 1
+            if r.sub_categories:
+                for sc in r.sub_categories:
+                    summary["categories"][sc] += 1
             
             # 每日统计
             if r.created_at:
@@ -342,13 +345,14 @@ class AIAnalyzer:
                     "insight": r.ai_insight[:200]
                 })
             
-            # 分类数据提取
-            if r.category == "MOOD" and r.meta_data:
+            # 分类数据提取（同时考虑副分类）
+            _all_cats = [r.category] + (r.sub_categories or [])
+            if "MOOD" in _all_cats and r.meta_data:
                 mood = r.meta_data.get("mood")
                 if mood:
                     summary["moods"].append(mood)
             
-            if r.category == "SLEEP" and r.meta_data:
+            if "SLEEP" in _all_cats and r.meta_data:
                 summary["sleep_data"].append({
                     "date": r.created_at.isoformat() if r.created_at else None,
                     "duration": r.meta_data.get("duration_hours"),
@@ -356,7 +360,7 @@ class AIAnalyzer:
                     "score": r.meta_data.get("score"),
                 })
             
-            if r.category == "SCREEN" and r.meta_data:
+            if "SCREEN" in _all_cats and r.meta_data:
                 top_apps = r.meta_data.get("top_apps") or []
                 summary["screen_data"].append({
                     "date": r.created_at.isoformat() if r.created_at else None,
@@ -366,7 +370,7 @@ class AIAnalyzer:
                     "health_score": r.meta_data.get("health_score"),
                 })
             
-            if r.category == "ACTIVITY" and r.meta_data:
+            if "ACTIVITY" in _all_cats and r.meta_data:
                 summary["activity_data"].append({
                     "date": r.created_at.isoformat() if r.created_at else None,
                     "type": r.meta_data.get("activity_type"),
@@ -374,7 +378,7 @@ class AIAnalyzer:
                     "calories": r.meta_data.get("calories_burned"),
                 })
             
-            if r.category == "DIET" and r.meta_data:
+            if "DIET" in _all_cats and r.meta_data:
                 food_items = r.meta_data.get("food_items") or []
                 summary["diet_data"].append({
                     "date": r.created_at.isoformat() if r.created_at else None,

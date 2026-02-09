@@ -86,6 +86,7 @@ class RAGService:
             metadata = {
                 "record_id": str(record.id),
                 "category": record.category or "UNKNOWN",
+                "sub_categories": ",".join(record.sub_categories) if record.sub_categories else "",
                 "created_at": record.created_at.isoformat() if record.created_at else "",
                 "date": record.created_at.strftime("%Y-%m-%d") if record.created_at else "",
                 "hour": record.created_at.hour if record.created_at else 0,
@@ -247,10 +248,15 @@ class RAGService:
             if not query_embedding:
                 return []
             
-            # 构建过滤条件
+            # 构建过滤条件（category 同时匹配主分类和副分类）
             where_filter = None
             if category:
-                where_filter = {"category": category}
+                where_filter = {
+                    "$or": [
+                        {"category": category},
+                        {"sub_categories": {"$contains": category}},
+                    ]
+                }
             
             # 搜索
             results = self.collection.query(

@@ -691,6 +691,7 @@ class DataExtractor:
             
             return {
                 "category": category,
+                "sub_categories": sub_categories,
                 "meta_data": meta_data,
                 "reply_text": reply_text,
                 "record_time": record_time,

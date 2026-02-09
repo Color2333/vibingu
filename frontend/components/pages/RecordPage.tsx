@@ -22,6 +22,7 @@ export interface FeedItem {
   thumbnail_path?: string;
   tags?: string[];
   dimension_scores?: Record<string, number>;
+  sub_categories?: string[];
   is_public?: boolean;
   is_bookmarked?: boolean;
   // 分步处理状态

@@ -24,6 +24,7 @@ interface RecordDetail {
   thumbnail_path: string | null;
   tags: string[] | null;
   dimension_scores: Record<string, number> | null;
+  sub_categories?: string[];
   is_public?: boolean;
   is_bookmarked?: boolean;
 }
@@ -63,6 +64,7 @@ export default function RecordDetailPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editRecordTime, setEditRecordTime] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
+  const [editSubCategories, setEditSubCategories] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
@@ -119,6 +121,7 @@ export default function RecordDetailPage() {
     setEditCategory(record.category || 'MOOD');
     setEditRecordTime(record.record_time ? record.record_time.slice(0, 16) : '');
     setEditTags(record.tags || []);
+    setEditSubCategories(record.sub_categories || []);
     setIsEditing(true);
   };
 
@@ -139,6 +142,7 @@ export default function RecordDetailPage() {
         body.record_time = new Date(editRecordTime).toISOString();
       }
       if (JSON.stringify(editTags) !== JSON.stringify(record.tags || [])) body.tags = editTags;
+      if (JSON.stringify(editSubCategories) !== JSON.stringify(record.sub_categories || [])) body.sub_categories = editSubCategories;
       
       if (Object.keys(body).length === 0) {
         setIsEditing(false);
@@ -159,6 +163,7 @@ export default function RecordDetailPage() {
           ...prev,
           raw_content: data.record.raw_content ?? prev.raw_content,
           category: data.record.category ?? prev.category,
+          sub_categories: data.record.sub_categories ?? prev.sub_categories,
           record_time: data.record.record_time ?? prev.record_time,
           tags: data.record.tags ?? prev.tags,
         } : prev);
@@ -297,9 +302,11 @@ export default function RecordDetailPage() {
 
   const config = categoryConfig[record.category] || categoryConfig.MOOD;
   const meta = record.meta_data || {};
-  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
-    sc => sc !== record.category && categoryConfig[sc]
-  ) || [];
+  const subCategories = (
+    (record.sub_categories && record.sub_categories.length > 0)
+      ? record.sub_categories
+      : (meta.sub_categories as string[] | undefined)
+  )?.filter(sc => sc !== record.category && categoryConfig[sc]) || [];
   const analysis = meta.analysis as string | undefined;
   const metaSuggestions = meta.suggestions as string[] | undefined;
   const healthScore = meta.health_score as number | undefined;
@@ -418,6 +425,34 @@ export default function RecordDetailPage() {
                   onChange={(e) => setEditRecordTime(e.target.value)}
                   className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
                 />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-tertiary)] mb-1.5 block">副分类（可选，选择与此记录相关的其他分类）</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_CATEGORIES.filter(cat => cat !== editCategory).map(cat => {
+                    const cfg = categoryConfig[cat];
+                    const isSelected = editSubCategories.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setEditSubCategories(prev =>
+                            isSelected ? prev.filter(c => c !== cat) : [...prev, cat]
+                          );
+                        }}
+                        className={`px-2.5 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
+                          isSelected 
+                            ? `${cfg?.bgColor} ${cfg?.color} ring-1 ring-current/20` 
+                            : 'bg-[var(--glass-bg)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {cfg?.label || cat}
+                        {isSelected && <span className="ml-0.5">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : (

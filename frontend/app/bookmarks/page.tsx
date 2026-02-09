@@ -12,6 +12,7 @@ interface BookmarkedRecord {
   ai_insight: string | null;
   created_at: string | null;
   record_time: string | null;
+  sub_categories?: string[];
   tags?: string[];
   is_bookmarked?: boolean;
 }

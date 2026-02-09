@@ -28,7 +28,14 @@ async def get_feed_history(
     query = db.query(LifeStream).order_by(desc(LifeStream.created_at))
     
     if category:
-        query = query.filter(LifeStream.category == category.upper())
+        cat_upper = category.upper()
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                LifeStream.category == cat_upper,
+                LifeStream.sub_categories.like(f'%"{cat_upper}"%'),
+            )
+        )
     
     records = query.offset(offset).limit(limit).all()
     
