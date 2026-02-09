@@ -56,12 +56,9 @@ interface SmartReminder {
 export default function AITimeInsights() {
   const [insights, setInsights] = useState<TimeInsights | null>(null);
   const [reminders, setReminders] = useState<SmartReminder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState<'insights' | 'schedule' | 'reminders'>('insights');
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -77,12 +74,46 @@ export default function AITimeInsights() {
       if (remindersRes.ok) {
         setReminders(await remindersRes.json());
       }
+      setGenerated(true);
     } catch (error) {
       console.error('Failed to fetch time insights:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // 未生成状态
+  if (!generated) {
+    return (
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-xl bg-violet-500/20">
+            <Clock className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">时间智能分析</h3>
+            <p className="text-xs text-[var(--text-tertiary)]">AI 驱动的时间模式洞察</p>
+          </div>
+        </div>
+        <div className="text-center py-6">
+          <div className="text-4xl mb-3">🕐</div>
+          <p className="text-sm text-[var(--text-secondary)] mb-1">分析你的生物钟和时间使用模式</p>
+          <p className="text-xs text-[var(--text-tertiary)] mb-4">将消耗少量 AI Token</p>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
+          >
+            {loading ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin" />分析中...</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5" />生成时间分析</>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

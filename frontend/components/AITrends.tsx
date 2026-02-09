@@ -56,39 +56,48 @@ const impactColors: Record<string, string> = {
 
 export default function AITrends({ className = '' }: Props) {
   const [data, setData] = useState<TrendsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState(false);
 
   const fetchTrends = async () => {
+    setLoading(true);
     try {
       const res = await fetch('/api/ai/trends?days=30');
       if (res.ok) {
         const trends = await res.json();
         setData(trends);
+        setGenerated(true);
       }
     } catch (error) {
       console.error('Failed to fetch AI trends:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchTrends();
-  }, []);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchTrends();
-  };
-
-  if (loading) {
+  // 未生成状态：显示提示 + 按钮
+  if (!generated) {
     return (
       <div className={`glass-card p-6 ${className}`}>
-        <div className="animate-pulse">
-          <div className="h-6 bg-[var(--glass-bg)] rounded w-1/3 mb-4"></div>
-          <div className="h-32 bg-[var(--glass-bg)] rounded"></div>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 趋势分析</h3>
+        </div>
+        <div className="text-center py-6">
+          <div className="text-4xl mb-3">📈</div>
+          <p className="text-sm text-[var(--text-secondary)] mb-1">分析近 30 天的行为模式和趋势</p>
+          <p className="text-xs text-[var(--text-tertiary)] mb-4">将消耗少量 AI Token</p>
+          <button
+            onClick={fetchTrends}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
+          >
+            {loading ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin" />生成中...</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5" />生成趋势分析</>
+            )}
+          </button>
         </div>
       </div>
     );
@@ -138,11 +147,12 @@ export default function AITrends({ className = '' }: Props) {
           )}
         </div>
         <button
-          onClick={handleRefresh}
-          disabled={refreshing}
+          onClick={fetchTrends}
+          disabled={loading}
           className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+          title="重新生成（消耗 Token）"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
