@@ -244,7 +244,7 @@ class DataExtractor:
 3. **深度分析**：挖掘文字背后的情绪、状态、可能的原因
 4. **给出建议**：基于分析，给出1-2条具体可行的建议
 
-分类选项：
+分类选项（选最主要的一个作为 category，如果涉及多个领域可填 sub_categories）：
 - SLEEP: 睡眠相关
 - DIET: 饮食相关
 - ACTIVITY: 运动相关
@@ -257,7 +257,8 @@ class DataExtractor:
 
 请以 JSON 格式输出（reply_text 必须放在前面优先生成）：
 {{
-    "category": "分类",
+    "category": "最主要的分类",
+    "sub_categories": ["次要分类1", "次要分类2"],
     "reply_text": "一句温暖、有内涵的回复（15-30字），反映用户的状态或给予鼓励。【必须】有洞察力。【禁止】返回'已记录'这种空洞回复。",
     "record_time": "事件实际发生时间，ISO格式如 {today_date}T{client_dt.strftime('%H:%M')}:00 或相对时间如'昨天'",
     "mood": "happy/neutral/sad/tired/anxious/excited/calm/etc",
@@ -500,12 +501,26 @@ class DataExtractor:
 当前时间：{current_time}（{time_period}）
 
 请分析这张{image_type_zh}照片，并：
-1. 描述照片内容
-2. 推测用户当时的情绪和状态
-3. 给出一句温暖的回复
+1. 判断这张照片最适合的分类
+2. 描述照片内容
+3. 推测用户当时的情绪和状态
+4. 给出一句温暖的回复
+
+分类选项（选最主要的一个作为 category，如果涉及多个领域可填 sub_categories）：
+- SLEEP: 睡眠相关
+- DIET: 饮食相关
+- ACTIVITY: 运动相关
+- MOOD: 情绪心情
+- SOCIAL: 社交相关（聚会、合照等）
+- WORK: 工作学习
+- GROWTH: 成长相关
+- LEISURE: 休闲娱乐
+- SCREEN: 屏幕时间
 
 请以 JSON 格式输出：
 {{
+    "category": "最主要的分类",
+    "sub_categories": ["次要分类1", "次要分类2"],
     "description": "照片内容描述",
     "record_time": "照片实际拍摄/发生时间，如用户说'昨天'则为昨天的日期",
     "mood": "happy/neutral/tired/excited/calm/etc",
@@ -630,8 +645,28 @@ class DataExtractor:
             else:
                 dimension_scores = None
             
+            # AI 返回的分类优先于默认分类
+            valid_categories = {"SLEEP", "DIET", "ACTIVITY", "MOOD", "SOCIAL", "WORK", "GROWTH", "LEISURE", "SCREEN"}
+            ai_category = result.pop("category", None)
+            if ai_category and str(ai_category).upper() in valid_categories:
+                category = str(ai_category).upper()
+                logger.info(f"AI 分类结果: {category}")
+            
+            # 处理副分类（混合类别）
+            raw_sub = result.pop("sub_categories", None)
+            sub_categories = []
+            if raw_sub and isinstance(raw_sub, list):
+                for sc in raw_sub:
+                    sc_upper = str(sc).upper()
+                    if sc_upper in valid_categories and sc_upper != category:
+                        sub_categories.append(sc_upper)
+                if sub_categories:
+                    logger.info(f"AI 副分类: {sub_categories}")
+            
             # 确保 analysis 和 suggestions 存在
             meta_data = {k: v for k, v in result.items() if k not in ["reply_text", "record_time", "record_date"]}
+            if sub_categories:
+                meta_data["sub_categories"] = sub_categories
             if "analysis" not in meta_data:
                 meta_data["analysis"] = None
             if "suggestions" not in meta_data:

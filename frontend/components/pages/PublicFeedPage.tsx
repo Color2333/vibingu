@@ -68,6 +68,9 @@ function RecordDetailModal({ record, config, onClose }: {
   onClose: () => void;
 }) {
   const meta = record.meta_data || {};
+  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
+    sc => sc !== record.category && categoryConfig[sc]
+  ) || [];
   const analysis = meta.analysis as string | undefined;
   const suggestions = meta.suggestions as string[] | undefined;
   const score = (meta.health_score || meta.score) as number | undefined;
@@ -107,6 +110,14 @@ function RecordDetailModal({ record, config, onClose }: {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-lg text-[var(--text-primary)]">{config.label}</span>
+                  {subCategories.map(sc => {
+                    const scCfg = categoryConfig[sc];
+                    return (
+                      <span key={sc} className={`text-[10px] px-1.5 py-0.5 rounded-full ${scCfg.bgColor} ${scCfg.color} opacity-70`}>
+                        {scCfg.label}
+                      </span>
+                    );
+                  })}
                   {score !== undefined && (
                     <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
                       score >= 70 ? 'bg-emerald-500/15 text-emerald-400' :
@@ -483,6 +494,9 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
                     {dayRecords.map((record, idx) => {
                       const config = categoryConfig[record.category] || categoryConfig.MOOD;
                       const meta = record.meta_data || {};
+                      const cardSubCats = (meta.sub_categories as string[] | undefined)?.filter(
+                        sc => sc !== record.category && categoryConfig[sc]
+                      ) || [];
                       const analysis = meta.analysis as string | undefined;
                       const score = (meta.health_score || meta.score) as number | undefined;
                       const durationHours = meta.duration_hours as number | undefined;
@@ -511,6 +525,14 @@ export default function PublicFeedPage({ onEnterPrivate }: PublicFeedPageProps) 
                                   {formatTime(record.record_time || record.created_at)}
                                 </span>
                                 <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+                                {cardSubCats.map(sc => {
+                                  const scCfg = categoryConfig[sc];
+                                  return (
+                                    <span key={sc} className={`text-[10px] px-1 py-0.5 rounded ${scCfg.bgColor} ${scCfg.color} opacity-60`}>
+                                      {scCfg.label}
+                                    </span>
+                                  );
+                                })}
                                 {score !== undefined && (
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                                     score >= 70 ? 'bg-emerald-500/10 text-emerald-400' :

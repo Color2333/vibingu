@@ -224,6 +224,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "生成今日洞察报告，只输出JSON。"}
                 ],
+                model=self.ai_client.models["text"],
                 max_tokens=6000,
                 task_type="daily_digest",
                 task_description="今日 AI 洞察",
@@ -431,6 +432,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "请分析我的数据，只输出JSON，不要其他内容。"}
                 ],
+                model=self.ai_client.models["text"],
                 max_tokens=6000,
                 task_type="weekly_analysis",
                 task_description="AI 周度分析",
@@ -496,6 +498,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "分析趋势，只输出JSON，不要其他内容。"}
                 ],
+                model=self.ai_client.models["text"],
                 max_tokens=5000,
                 task_type="trend_analysis",
                 task_description="AI 趋势分析",
@@ -557,6 +560,7 @@ class AIAnalyzer:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "给我一些建议，只输出JSON，不要其他内容。"}
                 ],
+                model=self.ai_client.models["text"],
                 max_tokens=5000,
                 task_type="smart_suggestions",
                 task_description="AI 智能建议",

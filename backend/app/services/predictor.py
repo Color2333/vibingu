@@ -959,6 +959,7 @@ class Predictor:
                     {"role": "system", "content": "你是一个生活状态预测专家。基于用户的历史数据模式进行预测。"},
                     {"role": "user", "content": prompt}
                 ],
+                model=ai_client.models["text"],
                 max_tokens=3000,
                 task_type="ai_prediction",
                 task_description="AI 次日预测",
@@ -1039,6 +1040,7 @@ class Predictor:
                     {"role": "system", "content": "你是一个健康风险分析专家。提供客观、有建设性的分析，避免过度担忧。"},
                     {"role": "user", "content": prompt}
                 ],
+                model=ai_client.models["text"],
                 max_tokens=3000,
                 task_type="risk_detection",
                 task_description="AI 风险检测",

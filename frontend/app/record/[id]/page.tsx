@@ -183,6 +183,9 @@ export default function RecordDetailPage() {
 
   const config = categoryConfig[record.category] || categoryConfig.MOOD;
   const meta = record.meta_data || {};
+  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
+    sc => sc !== record.category && categoryConfig[sc]
+  ) || [];
   const analysis = meta.analysis as string | undefined;
   const metaSuggestions = meta.suggestions as string[] | undefined;
   const healthScore = meta.health_score as number | undefined;
@@ -213,6 +216,14 @@ export default function RecordDetailPage() {
               <h1 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                 <span className={config.color}>{config.icon}</span>
                 {config.label}记录详情
+                {subCategories.map(sc => {
+                  const scCfg = categoryConfig[sc];
+                  return (
+                    <span key={sc} className={`text-xs px-1.5 py-0.5 rounded ${scCfg.bgColor} ${scCfg.color} opacity-70 font-normal`}>
+                      {scCfg.label}
+                    </span>
+                  );
+                })}
               </h1>
             </div>
           </div>

@@ -96,6 +96,10 @@ class ImageClassifier:
    - DIET: 饮食相关
    - SCREEN: 屏幕时间相关
    - ACTIVITY: 运动活动相关
+   - SOCIAL: 社交相关（聚会、合照、聊天等）
+   - WORK: 工作学习相关（办公、会议、笔记等）
+   - GROWTH: 个人成长（读书、课程、技能学习等）
+   - LEISURE: 休闲娱乐（游戏、电影、音乐等）
    - MOOD: 情绪/其他
 
 请以 JSON 格式输出：
@@ -105,7 +109,7 @@ class ImageClassifier:
     "save_reason": "原因说明（如果保存）",
     "content_hint": "图片内容简述",
     "confidence": 0.0-1.0,
-    "category_suggestion": "SLEEP|DIET|SCREEN|ACTIVITY|MOOD"
+    "category_suggestion": "SLEEP|DIET|SCREEN|ACTIVITY|SOCIAL|WORK|GROWTH|LEISURE|MOOD"
 }"""
 
         user_content = []

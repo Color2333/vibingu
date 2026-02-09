@@ -148,6 +148,11 @@ const TimelineCard = memo(function TimelineCard({
     return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // 副分类
+  const subCategories = (meta.sub_categories as string[] | undefined)?.filter(
+    sc => sc !== category && categoryConfig[sc]
+  ) || [];
+
   // 解析数据
   const analysis = meta.analysis as string | undefined;
   const suggestions = meta.suggestions as string[] | undefined;
@@ -222,6 +227,15 @@ const TimelineCard = memo(function TimelineCard({
                     : '连接服务器...'
                 ) : config.label}
               </span>
+              {/* 副分类标签 */}
+              {!isPending && subCategories.length > 0 && subCategories.map(sc => {
+                const scCfg = categoryConfig[sc];
+                return (
+                  <span key={sc} className={`text-[10px] px-1.5 py-0.5 rounded ${scCfg.bgColor} ${scCfg.color} opacity-70`}>
+                    {scCfg.label}
+                  </span>
+                );
+              })}
               {/* 公开标签 */}
               {!isPending && item.is_public && (
                 <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 flex items-center gap-1">

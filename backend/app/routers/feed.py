@@ -174,8 +174,22 @@ async def create_feed(
                 logger.warning(f"[Phase 2] 数据提取重试仍失败，使用基础数据: {e}")
                 ai_insight_failed = True
                 failed_phases.append("ai_insight")
+                # fallback 分类优先级: category_hint → 图片分类器建议 → MOOD
+                fallback_category = "MOOD"
+                if category_hint:
+                    try:
+                        fallback_category = Category(category_hint.upper()).value
+                    except ValueError:
+                        pass
+                elif classification_result:
+                    cat_s = classification_result.get("category_suggestion")
+                    if cat_s:
+                        try:
+                            fallback_category = Category(cat_s.upper()).value
+                        except ValueError:
+                            pass
                 extract_result = {
-                    "category": category_hint.upper() if category_hint else "MOOD",
+                    "category": fallback_category,
                     "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
                     "reply_text": text or "已记录（AI 分析暂时不可用）",
                 }
@@ -195,13 +209,23 @@ async def create_feed(
             image_path = None
             thumbnail_path = None
     
-    # 确定分类
+    # 确定分类：AI 分类优先 → category_hint 次之 → 图片分类器建议 → 默认 MOOD
     category = extract_result.get("category")
-    if category_hint:
-        try:
-            category = Category(category_hint.upper()).value
-        except ValueError:
-            pass
+    if not category:
+        if category_hint:
+            try:
+                category = Category(category_hint.upper()).value
+            except ValueError:
+                pass
+        if not category and classification_result:
+            cat_suggestion = classification_result.get("category_suggestion")
+            if cat_suggestion:
+                try:
+                    category = Category(cat_suggestion.upper()).value
+                except ValueError:
+                    pass
+        if not category:
+            category = "MOOD"
     
     # 合并元数据
     meta_data = extract_result.get("meta_data", {})
@@ -421,8 +445,22 @@ async def create_feed_stream(
                 else:
                     logger.warning(f"[Stream Phase 2] 重试仍失败: {e}")
                     failed_phases.append("ai_insight")
+                    # fallback 分类优先级: category_hint → 图片分类器建议 → MOOD
+                    fallback_category = "MOOD"
+                    if category_hint:
+                        try:
+                            fallback_category = Category(category_hint.upper()).value
+                        except ValueError:
+                            pass
+                    elif classification_result:
+                        cat_s = classification_result.get("category_suggestion")
+                        if cat_s:
+                            try:
+                                fallback_category = Category(cat_s.upper()).value
+                            except ValueError:
+                                pass
                     extract_result = {
-                        "category": category_hint.upper() if category_hint else "MOOD",
+                        "category": fallback_category,
                         "meta_data": {"_ai_error": "AI 分析暂时不可用，数据已保存"},
                         "reply_text": text or "已记录（AI 分析暂时不可用）",
                     }
@@ -445,13 +483,23 @@ async def create_feed_stream(
                 thumbnail_path = None
             yield _sse_event("phase", {"phase": "save_image", "status": "done"})
         
-        # 确定分类 & 合并元数据
+        # 确定分类：AI 分类优先 → category_hint 次之 → 图片分类器建议 → 默认 MOOD
         category = extract_result.get("category")
-        if category_hint:
-            try:
-                category = Category(category_hint.upper()).value
-            except ValueError:
-                pass
+        if not category:
+            if category_hint:
+                try:
+                    category = Category(category_hint.upper()).value
+                except ValueError:
+                    pass
+            if not category and classification_result:
+                cat_suggestion = classification_result.get("category_suggestion")
+                if cat_suggestion:
+                    try:
+                        category = Category(cat_suggestion.upper()).value
+                    except ValueError:
+                        pass
+            if not category:
+                category = "MOOD"
         
         meta_data = extract_result.get("meta_data", {})
         if classification_result:
@@ -984,6 +1032,7 @@ async def chat_with_record(
         ai_client = get_ai_client()
         response = await ai_client.chat_completion(
             messages=messages,
+            model=ai_client.models["text"],
             task_type="record_chat",
             task_description=f"与记录 {record_id} 对话",
             record_id=record_id,

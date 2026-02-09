@@ -1,182 +1,247 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, Trash2, Plus, MessageCircle, Clock, RotateCcw } from 'lucide-react';
+import { Send, Sparkles, Trash2, Plus, MessageCircle, Clock, RotateCcw, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // ======= 类型 =======
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-}
-
-interface Conversation {
+interface ConversationItem {
   id: string;
   title: string;
-  messages: Message[];
-  createdAt: number;
-  updatedAt: number;
+  updated_at: string;
+  message_count: number;
 }
 
-// ======= localStorage 持久化 =======
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
 
-const STORAGE_KEY = 'vibingu_chat_conversations';
+// ======= API helpers =======
 
-function loadConversations(): Conversation[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('auth_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   }
+  return headers;
 }
 
-function saveConversations(convs: Conversation[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(convs));
+async function apiGet<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
 
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+async function apiPost<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(url: string): Promise<void> {
+  const res = await fetch(url, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+}
+
+async function apiPatch(url: string, body: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
 }
 
 // ======= 组件 =======
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingContent, setStreamingContent] = useState('');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // ref 用来追踪当前 activeId，避免闭包问题
+  const activeIdRef = useRef<string | null>(null);
 
-  // 初始化：从 localStorage 加载
-  useEffect(() => {
-    const loaded = loadConversations();
-    setConversations(loaded);
-    if (loaded.length > 0) {
-      setActiveId(loaded[0].id);
+  // ======= 加载会话列表 =======
+  const fetchConversations = useCallback(async () => {
+    try {
+      const data = await apiGet<{ conversations: ConversationItem[] }>('/api/chat/conversations');
+      setConversations(data.conversations);
+      return data.conversations;
+    } catch (err) {
+      console.error('加载会话列表失败:', err);
+      return [];
+    } finally {
+      setLoadingConvs(false);
     }
   }, []);
 
-  // 持久化
-  useEffect(() => {
-    if (conversations.length > 0) {
-      saveConversations(conversations);
+  // ======= 加载单个会话的消息 =======
+  const fetchMessages = useCallback(async (convId: string) => {
+    setLoadingMessages(true);
+    try {
+      const data = await apiGet<{
+        id: string;
+        title: string;
+        messages: Message[];
+      }>(`/api/chat/conversations/${convId}`);
+      // 只有当仍然是当前活跃会话时才更新
+      if (activeIdRef.current === convId) {
+        setMessages(data.messages);
+      }
+    } catch (err) {
+      console.error('加载消息失败:', err);
+      if (activeIdRef.current === convId) {
+        setMessages([]);
+      }
+    } finally {
+      setLoadingMessages(false);
     }
-  }, [conversations]);
+  }, []);
 
-  // 滚动到底部
+  // ======= 初始化 =======
+  useEffect(() => {
+    (async () => {
+      const convs = await fetchConversations();
+      if (convs.length > 0) {
+        setActiveId(convs[0].id);
+        activeIdRef.current = convs[0].id;
+      }
+    })();
+  }, [fetchConversations]);
+
+  // ======= 切换会话时加载消息 =======
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    if (activeId) {
+      fetchMessages(activeId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeId, fetchMessages]);
+
+  // ======= 滚动到底部 =======
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversations, activeId, loading]);
-
-  const activeConv = conversations.find((c) => c.id === activeId) || null;
+  }, [messages, streamingContent, loading]);
 
   // ======= 操作 =======
 
-  const createNewChat = useCallback(() => {
-    const newConv: Conversation = {
-      id: generateId(),
-      title: '新对话',
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    setConversations((prev) => [newConv, ...prev]);
-    setActiveId(newConv.id);
-    setInput('');
+  const createNewChat = useCallback(async () => {
+    try {
+      const data = await apiPost<{ id: string; title: string }>('/api/chat/conversations', {
+        title: '新对话',
+      });
+      // 在列表头部插入新会话
+      setConversations((prev) => [
+        {
+          id: data.id,
+          title: data.title,
+          updated_at: new Date().toISOString(),
+          message_count: 0,
+        },
+        ...prev,
+      ]);
+      setActiveId(data.id);
+      setMessages([]);
+      setInput('');
+    } catch (err) {
+      console.error('创建会话失败:', err);
+    }
   }, []);
 
-  const deleteConversation = useCallback((id: string) => {
-    setConversations((prev) => {
-      const filtered = prev.filter((c) => c.id !== id);
-      saveConversations(filtered);
-      return filtered;
-    });
-    if (activeId === id) {
-      setActiveId(conversations.length > 1 ? conversations.find(c => c.id !== id)?.id || null : null);
-    }
-  }, [activeId, conversations]);
-
-  const buildHistory = useCallback((): { role: string; content: string }[] => {
-    if (!activeConv) return [];
-    return activeConv.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-  }, [activeConv]);
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      try {
+        await apiDelete(`/api/chat/conversations/${id}`);
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        if (activeId === id) {
+          setConversations((prev) => {
+            const next = prev.find((c) => c.id !== id);
+            setActiveId(next?.id || null);
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('删除会话失败:', err);
+      }
+    },
+    [activeId]
+  );
 
   // ======= 发送消息（流式） =======
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
 
-    // 如果没有活跃对话，自动创建一个
-    let targetId = activeId;
-    if (!targetId) {
-      const newConv: Conversation = {
-        id: generateId(),
-        title: text.slice(0, 20) + (text.length > 20 ? '...' : ''),
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      setConversations((prev) => [newConv, ...prev]);
-      targetId = newConv.id;
-      setActiveId(targetId);
-    }
-
-    const userMsg: Message = { role: 'user', content: text, timestamp: Date.now() };
-    const assistantMsg: Message = { role: 'assistant', content: '', timestamp: Date.now() };
-
-    // 添加消息
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === targetId
-          ? {
-              ...c,
-              messages: [...c.messages, userMsg, assistantMsg],
-              updatedAt: Date.now(),
-              title: c.messages.length === 0 ? text.slice(0, 20) + (text.length > 20 ? '...' : '') : c.title,
-            }
-          : c
-      )
-    );
     setInput('');
     setLoading(true);
+    setStreamingContent('');
+
+    // 乐观更新：先在本地显示用户消息
+    const tempUserMsg: Message = {
+      id: `temp-user-${Date.now()}`,
+      role: 'user',
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const history = buildHistory();
-
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ message: text, history }),
+        headers: authHeaders(),
+        body: JSON.stringify({
+          message: text,
+          conversation_id: activeId || undefined,
+        }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        updateLastAssistant(targetId, `抱歉，出了点问题 (${res.status})。${errData.detail || ''}`);
+        const errorMsg: Message = {
+          id: `temp-err-${Date.now()}`,
+          role: 'assistant',
+          content: `抱歉，出了点问题 (${res.status})。${errData.detail || ''}`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        updateLastAssistant(targetId, '流式连接失败');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `temp-err-${Date.now()}`,
+            role: 'assistant',
+            content: '流式连接失败',
+            created_at: new Date().toISOString(),
+          },
+        ]);
         return;
       }
 
       const decoder = new TextDecoder();
       let accumulated = '';
       let buffer = '';
+      let newConvId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -191,39 +256,77 @@ export default function ChatPage() {
           if (!trimmed || !trimmed.startsWith('data: ')) continue;
           try {
             const data = JSON.parse(trimmed.slice(6));
+
+            // 处理 meta 事件（第一个 data，包含 conversation_id）
+            if (data.conversation_id) {
+              newConvId = data.conversation_id;
+              if (data.is_new) {
+                // 新会话：更新 activeId 和会话列表
+                setActiveId(data.conversation_id);
+                activeIdRef.current = data.conversation_id;
+                setConversations((prev) => [
+                  {
+                    id: data.conversation_id,
+                    title: data.title || '新对话',
+                    updated_at: new Date().toISOString(),
+                    message_count: 1,
+                  },
+                  ...prev,
+                ]);
+              }
+              continue;
+            }
+
             if (data.done) break;
             if (data.content) {
               accumulated += data.content;
-              updateLastAssistant(targetId, accumulated);
+              setStreamingContent(accumulated);
             }
           } catch {
-            // skip
+            // skip malformed JSON
           }
         }
       }
 
-      if (!accumulated) {
-        updateLastAssistant(targetId, 'AI 未返回内容，请重试。');
+      // 流结束后：用最终内容替换 streaming 状态
+      setStreamingContent('');
+      if (accumulated) {
+        const assistantMsg: Message = {
+          id: `temp-assistant-${Date.now()}`,
+          role: 'assistant',
+          content: accumulated,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `temp-err-${Date.now()}`,
+            role: 'assistant',
+            content: 'AI 未返回内容，请重试。',
+            created_at: new Date().toISOString(),
+          },
+        ]);
       }
+
+      // 刷新会话列表以更新排序和标题
+      fetchConversations();
     } catch (err) {
       console.error('Chat stream error:', err);
-      updateLastAssistant(targetId, '网络错误，请检查连接后重试。');
+      setStreamingContent('');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `temp-err-${Date.now()}`,
+          role: 'assistant',
+          content: '网络错误，请检查连接后重试。',
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateLastAssistant = (convId: string, content: string) => {
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id !== convId) return c;
-        const msgs = [...c.messages];
-        if (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') {
-          msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content };
-        }
-        return { ...c, messages: msgs, updatedAt: Date.now() };
-      })
-    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -234,20 +337,19 @@ export default function ChatPage() {
   };
 
   const retryLast = () => {
-    if (!activeConv) return;
-    const lastUser = [...activeConv.messages].reverse().find((m) => m.role === 'user');
-    if (lastUser) {
-      // 移除最后一条 assistant 回复
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== activeId) return c;
-          const msgs = [...c.messages];
-          if (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') msgs.pop();
-          return { ...c, messages: msgs };
-        })
-      );
-      setTimeout(() => sendMessage(lastUser.content), 100);
-    }
+    if (messages.length === 0) return;
+    // 找到最后一条 user 消息
+    const lastUserIdx = [...messages].reverse().findIndex((m) => m.role === 'user');
+    if (lastUserIdx === -1) return;
+    const lastUser = messages[messages.length - 1 - lastUserIdx];
+    // 移除最后一条 assistant 回复（如果有）
+    setMessages((prev) => {
+      const copy = [...prev];
+      if (copy.length > 0 && copy[copy.length - 1].role === 'assistant') copy.pop();
+      if (copy.length > 0 && copy[copy.length - 1].role === 'user') copy.pop();
+      return copy;
+    });
+    setTimeout(() => sendMessage(lastUser.content), 100);
   };
 
   // ======= 推荐问题 =======
@@ -260,13 +362,15 @@ export default function ChatPage() {
     { text: '最好的一天是哪天？', icon: '🏆' },
   ];
 
-  const formatTime = (ts: number) => {
-    const d = new Date(ts);
+  const formatTime = (isoStr: string) => {
+    const d = new Date(isoStr);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
+
+  const activeConv = conversations.find((c) => c.id === activeId) || null;
 
   // ======= 渲染 =======
 
@@ -292,7 +396,12 @@ export default function ChatPage() {
 
           {/* 会话列表 */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {conversations.length === 0 && (
+            {loadingConvs && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-[var(--text-tertiary)] animate-spin" />
+              </div>
+            )}
+            {!loadingConvs && conversations.length === 0 && (
               <div className="text-center text-[var(--text-tertiary)] text-xs py-8">
                 还没有对话记录
               </div>
@@ -312,8 +421,8 @@ export default function ChatPage() {
                   <div className="text-sm text-[var(--text-primary)] truncate">{conv.title}</div>
                   <div className="text-[10px] text-[var(--text-tertiary)] flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {formatTime(conv.updatedAt)}
-                    <span className="ml-auto">{conv.messages.filter((m) => m.role === 'user').length} 条</span>
+                    {formatTime(conv.updated_at)}
+                    <span className="ml-auto">{conv.message_count} 条</span>
                   </div>
                 </div>
                 <button
@@ -355,8 +464,15 @@ export default function ChatPage() {
 
         {/* 消息区域 */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
+          {/* 加载消息中 */}
+          {loadingMessages && (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+            </div>
+          )}
+
           {/* 空状态：推荐问题 */}
-          {(!activeConv || activeConv.messages.length === 0) && !loading && (
+          {!loadingMessages && messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center h-full gap-6">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
@@ -364,7 +480,7 @@ export default function ChatPage() {
                 </div>
                 <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-1">AI 生活助手</h2>
                 <p className="text-sm text-[var(--text-tertiary)] max-w-md">
-                  基于你的所有生活记录，提供智能分析、趋势洞察和个性化建议。对话历史会自动保存。
+                  基于你的所有生活记录，提供智能分析、趋势洞察和个性化建议。对话历史永久保存在服务器。
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2 max-w-lg">
@@ -382,10 +498,10 @@ export default function ChatPage() {
           )}
 
           {/* 消息列表 */}
-          {activeConv && activeConv.messages.length > 0 && (
+          {!loadingMessages && (messages.length > 0 || loading) && (
             <div className="max-w-3xl mx-auto space-y-6">
-              {activeConv.messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${
                       msg.role === 'user'
@@ -394,29 +510,21 @@ export default function ChatPage() {
                     }`}
                   >
                     {msg.role === 'assistant' && msg.content ? (
-                      <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
-                        <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            strong: ({ children }) => (
-                              <strong className="text-[var(--text-primary)] font-semibold">{children}</strong>
-                            ),
-                            h1: ({ children }) => <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">{children}</h3>,
-                            h2: ({ children }) => <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1">{children}</h4>,
-                            h3: ({ children }) => <h5 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{children}</h5>,
-                            code: ({ children }) => (
-                              <code className="text-xs bg-[var(--bg-secondary)] px-1 py-0.5 rounded">{children}</code>
-                            ),
-                            hr: () => <hr className="border-[var(--border)] my-2" />,
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
-                    ) : msg.role === 'assistant' && !msg.content ? (
+                      <MarkdownContent content={msg.content} />
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* 正在流式生成的 assistant 消息 */}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] rounded-2xl px-5 py-3.5 bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-secondary)]">
+                    {streamingContent ? (
+                      <MarkdownContent content={streamingContent} />
+                    ) : (
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1">
                           <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
@@ -425,20 +533,18 @@ export default function ChatPage() {
                         </div>
                         <span className="text-xs text-[var(--text-tertiary)]">AI 思考中...</span>
                       </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     )}
                   </div>
                 </div>
-              ))}
+              )}
 
               {/* 重试按钮 */}
               {!loading &&
-                activeConv.messages.length > 0 &&
-                activeConv.messages[activeConv.messages.length - 1]?.role === 'assistant' &&
-                (activeConv.messages[activeConv.messages.length - 1]?.content.includes('抱歉') ||
-                  activeConv.messages[activeConv.messages.length - 1]?.content.includes('网络错误') ||
-                  activeConv.messages[activeConv.messages.length - 1]?.content.includes('重试')) && (
+                messages.length > 0 &&
+                messages[messages.length - 1]?.role === 'assistant' &&
+                (messages[messages.length - 1]?.content.includes('抱歉') ||
+                  messages[messages.length - 1]?.content.includes('网络错误') ||
+                  messages[messages.length - 1]?.content.includes('重试')) && (
                   <div className="flex justify-start pl-2">
                     <button
                       onClick={retryLast}
@@ -478,6 +584,41 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ======= Markdown 渲染子组件 =======
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+          li: ({ children }) => <li className="mb-1">{children}</li>,
+          strong: ({ children }) => (
+            <strong className="text-[var(--text-primary)] font-semibold">{children}</strong>
+          ),
+          h1: ({ children }) => (
+            <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">{children}</h3>
+          ),
+          h2: ({ children }) => (
+            <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1">{children}</h4>
+          ),
+          h3: ({ children }) => (
+            <h5 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{children}</h5>
+          ),
+          code: ({ children }) => (
+            <code className="text-xs bg-[var(--bg-secondary)] px-1 py-0.5 rounded">{children}</code>
+          ),
+          hr: () => <hr className="border-[var(--border)] my-2" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

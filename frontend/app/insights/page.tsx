@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import LoginScreen from '@/components/LoginScreen';
 import CircadianChart from '@/components/CircadianChart';
 import YearHeatmap from '@/components/YearHeatmap';
-import BioClockProfile from '@/components/BioClockProfile';
+import TodaySnapshot from '@/components/TodaySnapshot';
 import WeeklyPattern from '@/components/WeeklyPattern';
 import DimensionRadar from '@/components/DimensionRadar';
 import TagCloud from '@/components/TagCloud';
@@ -74,9 +74,9 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {/* Bio Clock Profile - Full width */}
+        {/* Today Snapshot - Full width */}
         <section className="mb-6 animate-fade-in">
-          <BioClockProfile />
+          <TodaySnapshot />
         </section>
 
         {/* Two column layout */}
