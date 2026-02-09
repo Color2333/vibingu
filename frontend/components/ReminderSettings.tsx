@@ -27,10 +27,12 @@ export default function ReminderSettings() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setReminders(reminders.map(r => ({
-          ...r,
-          ...parsed.find((p: Reminder) => p.id === r.id),
-        })));
+        setReminders(prev => prev.map(r => {
+          const saved = parsed.find((p: Reminder) => p.id === r.id);
+          if (!saved) return r;
+          // Only merge serializable fields, keep icon from default
+          return { ...r, time: saved.time ?? r.time, enabled: saved.enabled ?? r.enabled, message: saved.message ?? r.message };
+        }));
       } catch (e) {
         console.error('Load reminders failed:', e);
       }
@@ -40,7 +42,9 @@ export default function ReminderSettings() {
   const toggleReminder = (id: string) => {
     const updated = reminders.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r);
     setReminders(updated);
-    localStorage.setItem('vibingu_reminders', JSON.stringify(updated));
+    // Only persist serializable fields (exclude icon which is a React element)
+    const toSave = updated.map(({ id, name, time, enabled, message }) => ({ id, name, time, enabled, message }));
+    localStorage.setItem('vibingu_reminders', JSON.stringify(toSave));
   };
 
   const enabledCount = reminders.filter(r => r.enabled).length;

@@ -279,12 +279,12 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
               总计 {formatTokens(trend.reduce((s, d) => s + d.tokens, 0))}
             </span>
           </div>
-          <div className="flex items-end gap-[3px] h-14">
+          <div className="flex items-stretch gap-[3px] h-14">
             {trend.slice(-14).map((d, i) => {
               const h = Math.max((d.tokens / maxTokens) * 100, 4);
               const isToday = i === trend.slice(-14).length - 1;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5 group relative">
                   <div
                     className={`w-full rounded-t transition-all ${
                       isToday

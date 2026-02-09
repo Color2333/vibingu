@@ -414,6 +414,34 @@ body {
   }
 }
 
+/* ===== TOUCH OPTIMIZATIONS ===== */
+@media (pointer: coarse) {
+  /* 消除移动端点击蓝色高亮 */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 可滑动卡片防止水平滚动干扰 */
+  .swipeable-card {
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* 按钮激活态反馈 */
+  button:active,
+  a:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.1s;
+  }
+
+  /* 下拉刷新区域 */
+  .pull-to-refresh-container {
+    overscroll-behavior-y: contain;
+  }
+}
+
 /* 减少动画（无障碍性） */
 @media (prefers-reduced-motion: reduce) {
   *,

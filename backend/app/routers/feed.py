@@ -741,6 +741,10 @@ async def get_history(
     limit: int = 20,
     offset: int = 0,
     category: Optional[str] = None,
+    bookmarked: Optional[bool] = None,
+    search: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -749,7 +753,13 @@ async def get_history(
     - **limit**: 返回数量限制
     - **offset**: 偏移量
     - **category**: 筛选分类
+    - **bookmarked**: 仅返回已收藏记录
+    - **search**: 关键词搜索（模糊匹配 raw_content / ai_insight）
+    - **start_date**: 起始日期 (YYYY-MM-DD)
+    - **end_date**: 结束日期 (YYYY-MM-DD)
     """
+    from datetime import datetime as dt
+    
     # 按提交时间排序（最新提交的在前），排除已删除的记录
     query = db.query(LifeStream).filter(
         LifeStream.is_deleted != True
@@ -757,6 +767,34 @@ async def get_history(
     
     if category:
         query = query.filter(LifeStream.category == category.upper())
+    
+    if bookmarked is not None:
+        query = query.filter(LifeStream.is_bookmarked == bookmarked)
+    
+    if search:
+        keyword = f"%{search}%"
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                LifeStream.raw_content.ilike(keyword),
+                LifeStream.ai_insight.ilike(keyword),
+            )
+        )
+    
+    if start_date:
+        try:
+            start_dt = dt.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(LifeStream.created_at >= start_dt)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            from datetime import timedelta
+            end_dt = dt.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(LifeStream.created_at < end_dt)
+        except ValueError:
+            pass
     
     records = query.offset(offset).limit(limit).all()
     
@@ -777,6 +815,7 @@ async def get_history(
             "tags": r.tags,
             "dimension_scores": r.dimension_scores,
             "is_public": r.is_public or False,
+            "is_bookmarked": r.is_bookmarked or False,
         }
         for r in records
     ]
@@ -965,6 +1004,8 @@ async def get_record_detail(
         "thumbnail_path": f"/api/feed/image/{record.thumbnail_path}" if record.thumbnail_path else None,
         "tags": record.tags,
         "dimension_scores": record.dimension_scores,
+        "is_public": record.is_public or False,
+        "is_bookmarked": record.is_bookmarked or False,
     }
 
 
@@ -1119,3 +1160,107 @@ async def update_visibility(
         raise HTTPException(status_code=500, detail=f"更新失败: {e}")
     
     return {"success": True, "is_public": record.is_public}
+
+
+class BookmarkUpdate(BaseModel):
+    """收藏更新请求"""
+    is_bookmarked: bool
+
+
+@router.patch("/{record_id}/bookmark")
+async def update_bookmark(
+    record_id: str,
+    update: BookmarkUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_token),
+):
+    """
+    切换记录收藏状态 - 需要认证
+    
+    - **record_id**: 记录 ID
+    - **is_bookmarked**: 是否收藏
+    """
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    record.is_bookmarked = update.is_bookmarked
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"更新失败: {e}")
+    
+    return {"success": True, "is_bookmarked": record.is_bookmarked}
+
+
+class RecordUpdate(BaseModel):
+    """通用记录编辑请求"""
+    raw_content: Optional[str] = None
+    category: Optional[str] = None
+    record_time: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+@router.patch("/{record_id}")
+async def update_record(
+    record_id: str,
+    update: RecordUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_token),
+):
+    """
+    通用编辑记录 - 需要认证
+    
+    - **record_id**: 记录 ID
+    - 支持编辑 raw_content, category, record_time, tags
+    - 编辑后自动触发 RAG 重新索引
+    """
+    record = db.query(LifeStream).filter(LifeStream.id == record_id).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    
+    if update.raw_content is not None:
+        record.raw_content = update.raw_content
+    
+    if update.category is not None:
+        record.category = update.category.upper()
+    
+    if update.record_time is not None:
+        from datetime import datetime as dt
+        try:
+            record.record_time = dt.fromisoformat(update.record_time)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="时间格式无效，请使用 ISO 格式")
+    
+    if update.tags is not None:
+        record.tags = update.tags
+    
+    try:
+        db.commit()
+        db.refresh(record)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"更新失败: {e}")
+    
+    # 触发 RAG 重新索引
+    try:
+        rag = get_rag()
+        if rag:
+            rag.index_record(record)
+            logger.info(f"记录 {record_id} 已重新索引到 RAG")
+    except Exception as e:
+        logger.warning(f"RAG 重新索引失败: {e}")
+    
+    return {
+        "success": True,
+        "record": {
+            "id": str(record.id),
+            "raw_content": record.raw_content,
+            "category": record.category,
+            "record_time": record.record_time.isoformat() if record.record_time else None,
+            "tags": record.tags,
+        }
+    }

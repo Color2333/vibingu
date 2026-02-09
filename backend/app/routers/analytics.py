@@ -58,16 +58,27 @@ def _build_vibe_response(target_date: date, vibe_data: dict) -> VibeScoreRespons
 
 
 @router.get("/vibe/today", response_model=VibeScoreResponse)
-async def get_today_vibe(db: Session = Depends(get_db)):
-    """获取今天的 Vibing Index"""
-    today = date.today()
+async def get_today_vibe(
+    date_param: Optional[str] = Query(None, alias="date", description="指定日期 YYYY-MM-DD，默认今天"),
+    db: Session = Depends(get_db),
+):
+    """获取今天（或指定日期）的 Vibing Index"""
+    if date_param:
+        try:
+            target_date = datetime.strptime(date_param, "%Y-%m-%d").date()
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
+    else:
+        target_date = date.today()
+    
     calculator = VibeCalculator(db)
-    vibe_data = calculator.calculate_daily_vibe(today)
+    vibe_data = calculator.calculate_daily_vibe(target_date)
     
     # 同时更新 daily_summary
-    calculator.update_daily_summary(today)
+    calculator.update_daily_summary(target_date)
     
-    return _build_vibe_response(today, vibe_data)
+    return _build_vibe_response(target_date, vibe_data)
 
 
 @router.get("/vibe/{date_str}", response_model=VibeScoreResponse)
@@ -98,18 +109,25 @@ async def get_vibe_score(
 @router.get("/trend", response_model=List[TrendDataPoint])
 async def get_vibe_trend(
     days: int = Query(7, ge=1, le=30, description="获取最近多少天的数据"),
+    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD，默认今天"),
     db: Session = Depends(get_db),
 ):
     """
-    获取最近 N 天的 Vibing Index 趋势
+    获取最近 N 天的 Vibing Index 趋势（以 end_date 为终点倒推 N 天）
     """
     calculator = VibeCalculator(db)
     trend = []
     
-    today = date.today()
+    if end_date:
+        try:
+            base_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            base_date = date.today()
+    else:
+        base_date = date.today()
     
     for i in range(days):
-        target_date = today - timedelta(days=i)
+        target_date = base_date - timedelta(days=i)
         vibe_data = calculator.calculate_daily_vibe(target_date)
         trend.append(TrendDataPoint(
             date=target_date,
@@ -274,17 +292,33 @@ async def get_dimensions_meta():
 
 
 @router.get("/dimensions/today")
-async def get_today_dimensions():
-    """获取今日的八维度分析"""
+async def get_today_dimensions(
+    date_param: Optional[str] = Query(None, alias="date", description="指定日期 YYYY-MM-DD，默认今天"),
+):
+    """获取今日（或指定日期）的八维度分析"""
+    target_dt = None
+    if date_param:
+        try:
+            target_dt = datetime.strptime(date_param, "%Y-%m-%d")
+        except ValueError:
+            pass
     analyzer = get_dimension_analyzer()
-    return analyzer.get_daily_dimension_summary()
+    return analyzer.get_daily_dimension_summary(target_dt)
 
 
 @router.get("/dimensions/radar/today")
-async def get_today_radar():
-    """获取今日八维度雷达图数据"""
+async def get_today_radar(
+    date_param: Optional[str] = Query(None, alias="date", description="指定日期 YYYY-MM-DD，默认今天"),
+):
+    """获取今日（或指定日期）八维度雷达图数据"""
+    target_dt = None
+    if date_param:
+        try:
+            target_dt = datetime.strptime(date_param, "%Y-%m-%d")
+        except ValueError:
+            pass
     analyzer = get_dimension_analyzer()
-    return analyzer.get_dimension_radar_data()
+    return analyzer.get_dimension_radar_data(target_dt)
 
 
 @router.get("/dimensions/radar/{date_str}")

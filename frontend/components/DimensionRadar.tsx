@@ -34,9 +34,10 @@ interface DimensionSummary {
 
 interface Props {
   className?: string;
+  date?: string;
 }
 
-export default function DimensionRadar({ className = '' }: Props) {
+export default function DimensionRadar({ className = '', date }: Props) {
   const [data, setData] = useState<DimensionData[]>([]);
   const [summary, setSummary] = useState<DimensionSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,13 +47,14 @@ export default function DimensionRadar({ className = '' }: Props) {
 
   useEffect(() => {
     fetchDimensions();
-  }, []);
+  }, [date]);
 
   const fetchDimensions = async () => {
+    const dateParam = date ? `?date=${date}` : '';
     try {
       const [radarRes, summaryRes] = await Promise.all([
-        fetch('/api/analytics/dimensions/radar/today'),
-        fetch('/api/analytics/dimensions/today'),
+        fetch(`/api/analytics/dimensions/radar/today${dateParam}`),
+        fetch(`/api/analytics/dimensions/today${dateParam}`),
       ]);
 
       if (radarRes.ok) {

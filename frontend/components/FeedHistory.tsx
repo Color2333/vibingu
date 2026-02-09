@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, X, Users, Briefcase, BookOpen, 
   Gamepad2, Sparkles, Lightbulb, ChevronRight, MessageCircle,
   MoreVertical, Trash2, Globe, Lock, Calendar, XCircle,
-  Brain, Tag, Check, RefreshCw, Loader2
+  Brain, Tag, Check, RefreshCw, Loader2, Bookmark, Pencil
 } from 'lucide-react';
 import type { FeedItem } from '@/components/pages/RecordPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -16,6 +16,7 @@ interface FeedHistoryProps {
   items: FeedItem[];
   onDelete?: (id: string) => void;
   onTogglePublic?: (id: string, isPublic: boolean) => void;
+  onToggleBookmark?: (id: string, isBookmarked: boolean) => void;
   onDismissFailed?: (id: string) => void;
   onRetryFailed?: (id: string) => void;
   onRegenerate?: (id: string, phases: string[]) => void;
@@ -66,6 +67,7 @@ interface TimelineCardProps {
   isLast: boolean;
   onDelete?: (id: string) => void;
   onTogglePublic?: (id: string, isPublic: boolean) => void;
+  onToggleBookmark?: (id: string, isBookmarked: boolean) => void;
   onDismissFailed?: (id: string) => void;
   onRetryFailed?: (id: string) => void;
   onRegenerate?: (id: string, phases: string[]) => void;
@@ -77,6 +79,7 @@ const TimelineCard = memo(function TimelineCard({
   isLast, 
   onDelete, 
   onTogglePublic,
+  onToggleBookmark,
   onDismissFailed,
   onRetryFailed,
   onRegenerate,
@@ -85,10 +88,59 @@ const TimelineCard = memo(function TimelineCard({
   const [showImage, setShowImage] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [swipeX, setSwipeX] = useState(0);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeLockedRef = useRef<'h' | 'v' | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const hasAnimatedRef = useRef(false);
   const router = useRouter();
+
+  // Swipe handlers for mobile
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    if (item._pending || item._failed) return;
+    swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    swipeLockedRef.current = null;
+  };
+
+  const handleSwipeMove = (e: React.TouchEvent) => {
+    if (!swipeStartRef.current) return;
+    const dx = e.touches[0].clientX - swipeStartRef.current.x;
+    const dy = e.touches[0].clientY - swipeStartRef.current.y;
+
+    // Lock direction after 10px of movement
+    if (!swipeLockedRef.current) {
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        swipeLockedRef.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      }
+      return;
+    }
+    if (swipeLockedRef.current === 'v') return;
+
+    // Only allow left swipe (negative dx)
+    if (dx < 0) {
+      setSwipeX(Math.max(dx, -120));
+    } else if (swipeX < 0) {
+      // Allow swiping back right
+      setSwipeX(Math.min(0, dx + swipeX));
+    }
+  };
+
+  const handleSwipeEnd = () => {
+    swipeStartRef.current = null;
+    swipeLockedRef.current = null;
+    // Snap to open or closed
+    if (swipeX < -60) {
+      setSwipeX(-100); // Show action buttons
+    } else {
+      setSwipeX(0);
+    }
+  };
+
+  // Close swipe when menu/image opens
+  useEffect(() => {
+    if (showMenu || showImage || showDeleteConfirm) setSwipeX(0);
+  }, [showMenu, showImage, showDeleteConfirm]);
   
   // 点击外部关闭菜单
   useEffect(() => {
@@ -201,8 +253,40 @@ const TimelineCard = memo(function TimelineCard({
         )}
       </div>
       
-      {/* 右侧内容 */}
-      <div className={`flex-1 pb-4 rounded-2xl overflow-hidden transition-all duration-500 ${
+      {/* 右侧内容：可滑动容器 */}
+      <div className="flex-1 pb-4 relative overflow-hidden swipeable-card">
+        {/* 滑动后露出的操作按钮 */}
+        {swipeX < -10 && (
+          <div className="absolute right-0 top-0 bottom-4 flex items-stretch z-10" style={{ width: 100 }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleBookmark?.(item.id, !item.is_bookmarked);
+                setSwipeX(0);
+              }}
+              className="flex-1 flex items-center justify-center bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors rounded-l-xl"
+            >
+              <Bookmark className={`w-5 h-5 ${item.is_bookmarked ? 'fill-current' : ''}`} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSwipeX(0);
+                setShowDeleteConfirm(true);
+              }}
+              className="flex-1 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors rounded-r-xl"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+      <div 
+        onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
+        onTouchEnd={handleSwipeEnd}
+        style={{ transform: swipeX ? `translateX(${swipeX}px)` : undefined }}
+        className={`rounded-2xl overflow-hidden transition-transform duration-200 ${
         isFailed
           ? 'bg-gradient-to-br from-red-500/5 to-orange-500/5 border border-red-500/20 opacity-80'
           : isPending 
@@ -269,6 +353,24 @@ const TimelineCard = memo(function TimelineCard({
             
             {/* 右侧操作按钮 */}
             <div className="flex items-center gap-1 flex-shrink-0">
+              {/* 收藏按钮 */}
+              {!isPending && !isFailed && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleBookmark?.(item.id, !item.is_bookmarked);
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    item.is_bookmarked 
+                      ? 'text-amber-400 hover:text-amber-300' 
+                      : 'text-[var(--text-tertiary)] hover:text-amber-400 hover:bg-[var(--glass-bg)]'
+                  }`}
+                  aria-label={item.is_bookmarked ? '取消收藏' : '收藏'}
+                  title={item.is_bookmarked ? '取消收藏' : '收藏'}
+                >
+                  <Bookmark className={`w-4 h-4 ${item.is_bookmarked ? 'fill-current' : ''}`} />
+                </button>
+              )}
               {/* 管理菜单 */}
               {showManagement && !isPending && (
                 <div className="relative" ref={menuRef}>
@@ -286,6 +388,17 @@ const TimelineCard = memo(function TimelineCard({
                   
                   {showMenu && (
                     <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl py-1 min-w-[140px] backdrop-blur-xl">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          router.push(`/record/${item.id}?edit=1`);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] flex items-center gap-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        编辑
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -579,6 +692,7 @@ const TimelineCard = memo(function TimelineCard({
           )}
         </div>
       </div>
+      </div>
 
       {/* 图片模态框 */}
       {showImage && item.image_path && (
@@ -623,6 +737,7 @@ const TimelineCard = memo(function TimelineCard({
   const n = nextProps.item;
   return p.id === n.id && p._pending === n._pending && p._failed === n._failed 
     && p.ai_insight === n.ai_insight && p.is_public === n.is_public
+    && p.is_bookmarked === n.is_bookmarked
     && p.failed_phases?.length === n.failed_phases?.length
     && p._regenerating?.length === n._regenerating?.length
     && p.tags?.length === n.tags?.length
@@ -673,6 +788,7 @@ export default function FeedHistory({
   items, 
   onDelete, 
   onTogglePublic,
+  onToggleBookmark,
   onDismissFailed,
   onRetryFailed,
   onRegenerate,
@@ -910,6 +1026,7 @@ export default function FeedHistory({
                       isLast={idx === dayItems.length - 1}
                       onDelete={onDelete}
                       onTogglePublic={onTogglePublic}
+                      onToggleBookmark={onToggleBookmark}
                       onDismissFailed={onDismissFailed}
                       onRetryFailed={onRetryFailed}
                       onRegenerate={onRegenerate}

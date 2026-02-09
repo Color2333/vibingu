@@ -1,9 +1,7 @@
 'use client';
 
-import ReminderSettings from '@/components/ReminderSettings';
 import TokenUsage from '@/components/TokenUsage';
-import ShareCard from '@/components/ShareCard';
-import { Download, Upload, Trash2, Database, User, Check, Loader2 } from 'lucide-react';
+import { Download, Database, User, Check, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 function NicknameSection() {
@@ -147,15 +145,6 @@ export default function SettingsPage() {
         <NicknameSection />
       </section>
 
-      {/* 提醒设置 */}
-      <section className="animate-fade-in">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">提醒设置</h2>
-          <p className="text-xs text-[var(--text-tertiary)] mt-0.5">设置记录提醒时间</p>
-        </div>
-        <ReminderSettings />
-      </section>
-
       {/* Token 用量 */}
       <section className="animate-fade-in delay-1 pt-4 border-t border-[var(--border)]">
         <div className="mb-3">
@@ -205,17 +194,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 分享卡片生成 */}
-      <section className="animate-fade-in delay-3 pt-4 border-t border-[var(--border)]">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">分享卡片</h2>
-          <p className="text-xs text-[var(--text-tertiary)] mt-0.5">生成精美的状态分享图</p>
-        </div>
-        <ShareCard />
-      </section>
-
       {/* 关于 */}
-      <section className="animate-fade-in delay-4 pt-4 border-t border-[var(--border)]">
+      <section className="animate-fade-in delay-3 pt-4 border-t border-[var(--border)]">
         <div className="p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)]">
           <div className="text-center">
             <div className="text-2xl mb-2">✨</div>

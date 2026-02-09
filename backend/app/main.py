@@ -58,6 +58,11 @@ def run_migrations():
             cursor.execute("ALTER TABLE life_stream ADD COLUMN is_deleted BOOLEAN DEFAULT 0")
             logger.info("自动迁移: 添加 is_deleted 列")
         
+        # 添加 is_bookmarked 列（v0.4）
+        if "is_bookmarked" not in columns:
+            cursor.execute("ALTER TABLE life_stream ADD COLUMN is_bookmarked BOOLEAN DEFAULT 0")
+            logger.info("自动迁移: 添加 is_bookmarked 列")
+        
         conn.commit()
         conn.close()
     except Exception as e:

@@ -94,6 +94,7 @@ class LifeStream(Base):
     # 可见性与删除状态
     is_public = Column(Boolean, default=False, comment="是否公开可见")
     is_deleted = Column(Boolean, default=False, comment="是否已删除（软删除）")
+    is_bookmarked = Column(Boolean, default=False, comment="是否已收藏")
     
     def __repr__(self):
         return f"<LifeStream(id={self.id}, category={self.category}, created_at={self.created_at})>"

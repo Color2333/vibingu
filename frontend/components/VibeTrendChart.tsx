@@ -8,7 +8,7 @@ interface TrendData {
   vibe_score: number | null;
 }
 
-export default function VibeTrendChart() {
+export default function VibeTrendChart({ endDate }: { endDate?: string } = {}) {
   const [data, setData] = useState<TrendData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -18,7 +18,9 @@ export default function VibeTrendChart() {
     const fetchTrend = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/analytics/trend?days=${days}`);
+        let url = `/api/analytics/trend?days=${days}`;
+        if (endDate) url += `&end_date=${endDate}`;
+        const response = await fetch(url);
         if (response.ok) {
           const result = await response.json();
           setData(result);
@@ -31,7 +33,7 @@ export default function VibeTrendChart() {
     };
 
     fetchTrend();
-  }, [days]);
+  }, [days, endDate]);
 
   if (isLoading) {
     return (

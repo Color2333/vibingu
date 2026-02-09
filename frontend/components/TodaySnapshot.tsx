@@ -41,17 +41,18 @@ const DIM_CONFIG: Record<string, { icon: React.ReactNode; label: string; color: 
   leisure: { icon: <Gamepad2 className="w-3.5 h-3.5" />,   label: '休闲', color: 'text-pink-400',    barColor: 'bg-pink-400' },
 };
 
-export default function TodaySnapshot() {
+export default function TodaySnapshot({ date }: { date?: string }) {
   const [vibeData, setVibeData] = useState<VibeData | null>(null);
   const [dimData, setDimData] = useState<DimensionData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const dateParam = date ? `?date=${date}` : '';
     try {
       const [vibeRes, dimRes] = await Promise.all([
-        fetch('/api/analytics/vibe/today'),
-        fetch('/api/analytics/dimensions/today'),
+        fetch(`/api/analytics/vibe/today${dateParam}`),
+        fetch(`/api/analytics/dimensions/today${dateParam}`),
       ]);
       if (vibeRes.ok) setVibeData(await vibeRes.json());
       if (dimRes.ok) setDimData(await dimRes.json());
@@ -60,7 +61,7 @@ export default function TodaySnapshot() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [date]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft, Clock, Moon, Utensils, Smartphone, Activity, 
   Smile, Users, Briefcase, BookOpen, Gamepad2, Send, 
-  Sparkles, Image as ImageIcon, X, Lightbulb, RefreshCw
+  Sparkles, Image as ImageIcon, X, Lightbulb, RefreshCw,
+  Bookmark, Pencil, Check as CheckIcon, XCircle, Save
 } from 'lucide-react';
 
 interface RecordDetail {
@@ -23,6 +24,8 @@ interface RecordDetail {
   thumbnail_path: string | null;
   tags: string[] | null;
   dimension_scores: Record<string, number> | null;
+  is_public?: boolean;
+  is_bookmarked?: boolean;
 }
 
 interface ChatMessage {
@@ -42,14 +45,26 @@ const categoryConfig: Record<string, { icon: React.ReactNode; color: string; bgC
   LEISURE: { icon: <Gamepad2 className="w-5 h-5" />, color: 'text-amber-400', bgColor: 'bg-amber-500/10', label: '休闲' },
 };
 
+const ALL_CATEGORIES = ['SLEEP', 'DIET', 'SCREEN', 'ACTIVITY', 'MOOD', 'SOCIAL', 'WORK', 'GROWTH', 'LEISURE'];
+
 export default function RecordDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const recordId = params.id as string;
   
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editRecordTime, setEditRecordTime] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -89,6 +104,105 @@ export default function RecordDetailPage() {
       fetchRecord();
     }
   }, [recordId]);
+
+  // Check if edit mode was requested via URL param
+  useEffect(() => {
+    if (searchParams.get('edit') === '1' && record) {
+      enterEditMode();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record, searchParams]);
+
+  const enterEditMode = () => {
+    if (!record) return;
+    setEditContent(record.raw_content || '');
+    setEditCategory(record.category || 'MOOD');
+    setEditRecordTime(record.record_time ? record.record_time.slice(0, 16) : '');
+    setEditTags(record.tags || []);
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setNewTag('');
+  };
+
+  const saveEdit = async () => {
+    if (!record) return;
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('vibingu_token');
+      const body: Record<string, unknown> = {};
+      if (editContent !== (record.raw_content || '')) body.raw_content = editContent;
+      if (editCategory !== record.category) body.category = editCategory;
+      if (editRecordTime && editRecordTime !== (record.record_time || '').slice(0, 16)) {
+        body.record_time = new Date(editRecordTime).toISOString();
+      }
+      if (JSON.stringify(editTags) !== JSON.stringify(record.tags || [])) body.tags = editTags;
+      
+      if (Object.keys(body).length === 0) {
+        setIsEditing(false);
+        return;
+      }
+
+      const res = await fetch(`/api/feed/${record.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRecord(prev => prev ? {
+          ...prev,
+          raw_content: data.record.raw_content ?? prev.raw_content,
+          category: data.record.category ?? prev.category,
+          record_time: data.record.record_time ?? prev.record_time,
+          tags: data.record.tags ?? prev.tags,
+        } : prev);
+        setIsEditing(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    if (!record) return;
+    const newVal = !record.is_bookmarked;
+    try {
+      const token = localStorage.getItem('vibingu_token');
+      const res = await fetch(`/api/feed/${record.id}/bookmark`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ is_bookmarked: newVal }),
+      });
+      if (res.ok) {
+        setRecord(prev => prev ? { ...prev, is_bookmarked: newVal } : prev);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const addTag = () => {
+    const tag = newTag.trim();
+    if (tag && !editTags.includes(tag)) {
+      setEditTags([...editTags, tag]);
+    }
+    setNewTag('');
+  };
+
+  const removeTag = (tag: string) => {
+    setEditTags(editTags.filter(t => t !== tag));
+  };
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -226,14 +340,87 @@ export default function RecordDetailPage() {
                 })}
               </h1>
             </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleBookmark}
+                className={`p-2 rounded-lg transition-colors ${
+                  record.is_bookmarked 
+                    ? 'text-amber-400 hover:text-amber-300' 
+                    : 'text-[var(--text-tertiary)] hover:text-amber-400 hover:bg-[var(--glass-bg)]'
+                }`}
+                title={record.is_bookmarked ? '取消收藏' : '收藏'}
+              >
+                <Bookmark className={`w-5 h-5 ${record.is_bookmarked ? 'fill-current' : ''}`} />
+              </button>
+              {!isEditing && (
+                <button
+                  onClick={enterEditMode}
+                  className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+                  title="编辑"
+                >
+                  <Pencil className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl">
+        {/* Edit mode toolbar */}
+        {isEditing && (
+          <div className="flex items-center justify-between mb-4 p-3 glass-card rounded-xl border border-indigo-500/20">
+            <span className="text-sm text-indigo-400 flex items-center gap-2">
+              <Pencil className="w-4 h-4" />
+              编辑模式
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={cancelEdit}
+                className="px-3 py-1.5 text-xs rounded-lg bg-[var(--glass-bg)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={isSaving}
+                className="px-3 py-1.5 text-xs rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Record Content */}
         <div className="glass-card p-6 mb-6">
-          {/* Time */}
+          {/* Time + Category (edit mode) */}
+          {isEditing ? (
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[var(--text-tertiary)] w-16 flex-shrink-0">分类</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                >
+                  {ALL_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{categoryConfig[cat]?.label || cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[var(--text-tertiary)] w-16 flex-shrink-0">时间</label>
+                <input
+                  type="datetime-local"
+                  value={editRecordTime}
+                  onChange={(e) => setEditRecordTime(e.target.value)}
+                  className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            </div>
+          ) : (
           <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mb-4">
             <Clock className="w-4 h-4" />
             <span>{(record.record_time || record.created_at) ? formatDateTime(record.record_time || record.created_at!) : '未知时间'}</span>
@@ -247,6 +434,7 @@ export default function RecordDetailPage() {
               </span>
             )}
           </div>
+          )}
 
           {/* 睡眠数据卡片 */}
           {record.category === 'SLEEP' && (sleepTime || wakeTime || durationHours) && (
@@ -312,7 +500,21 @@ export default function RecordDetailPage() {
           )}
 
           {/* Original Content */}
-          {(() => {
+          {isEditing ? (
+            <div className="mb-4">
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                <span>内容</span>
+              </h3>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={5}
+                className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] resize-y leading-relaxed"
+                placeholder="记录内容..."
+              />
+            </div>
+          ) : (
+          (() => {
             const content = record.raw_content;
             if (content && !content.startsWith('/') && !content.includes('/Users/')) {
               return (
@@ -327,7 +529,8 @@ export default function RecordDetailPage() {
               );
             }
             return null;
-          })()}
+          })()
+          )}
 
           {/* AI Insight */}
           {record.ai_insight && record.ai_insight !== '已记录' && (
@@ -390,7 +593,42 @@ export default function RecordDetailPage() {
           )}
 
           {/* Tags */}
-          {record.tags && record.tags.length > 0 && (
+          {isEditing ? (
+            <div className="mb-4">
+              <h3 className="text-xs text-[var(--text-tertiary)] mb-2">标签</h3>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {editTags.map((tag, idx) => (
+                  <span 
+                    key={idx} 
+                    className="px-2 py-1 text-xs rounded-lg bg-[var(--glass-bg)] text-[var(--text-tertiary)] flex items-center gap-1"
+                  >
+                    {tag}
+                    <button onClick={() => removeTag(tag)} className="text-[var(--text-tertiary)] hover:text-red-400">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                  placeholder="添加标签..."
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-[var(--glass-bg)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={addTag}
+                  disabled={!newTag.trim()}
+                  className="px-2 py-1.5 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+                >
+                  添加
+                </button>
+              </div>
+            </div>
+          ) : (
+          record.tags && record.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {record.tags.map((tag, idx) => (
                 <span 
@@ -401,6 +639,7 @@ export default function RecordDetailPage() {
                 </span>
               ))}
             </div>
+          )
           )}
 
           {/* Dimension Scores */}

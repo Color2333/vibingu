@@ -91,7 +91,21 @@ export default function ShareCard() {
       const res = await fetch('/api/analytics/dimensions/today');
       if (res.ok) {
         const data = await res.json();
-        setDimensions(data.dimensions);
+        // API 返回 { body: { score: 50, ... }, mood: { score: 60, ... }, ... }
+        // 需要提取每个维度的 score 数字
+        const raw = data.dimensions;
+        if (raw) {
+          setDimensions({
+            body: typeof raw.body === 'number' ? raw.body : (raw.body?.score ?? null),
+            mood: typeof raw.mood === 'number' ? raw.mood : (raw.mood?.score ?? null),
+            social: typeof raw.social === 'number' ? raw.social : (raw.social?.score ?? null),
+            work: typeof raw.work === 'number' ? raw.work : (raw.work?.score ?? null),
+            growth: typeof raw.growth === 'number' ? raw.growth : (raw.growth?.score ?? null),
+            meaning: typeof raw.meaning === 'number' ? raw.meaning : (raw.meaning?.score ?? null),
+            digital: typeof raw.digital === 'number' ? raw.digital : (raw.digital?.score ?? null),
+            leisure: typeof raw.leisure === 'number' ? raw.leisure : (raw.leisure?.score ?? null),
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to fetch dimensions:', e);
@@ -300,10 +314,16 @@ export default function ShareCard() {
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all btn"
-        title="分享"
+        className="flex items-center gap-3 w-full p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)]
+                   hover:bg-[var(--bg-secondary)] hover:border-[var(--glass-border)] transition-all group text-left"
       >
-        <Share2 className="w-5 h-5" />
+        <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20 transition-colors">
+          <Share2 className="w-5 h-5" />
+        </div>
+        <div>
+          <div className="text-sm text-[var(--text-primary)]">生成分享卡片</div>
+          <div className="text-xs text-[var(--text-tertiary)]">生成今日状态的精美分享图</div>
+        </div>
       </button>
 
       {/* Modal */}

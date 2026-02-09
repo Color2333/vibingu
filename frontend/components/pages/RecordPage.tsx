@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import MagicInputBar from '@/components/MagicInputBar';
 import FeedHistory from '@/components/FeedHistory';
 import EmptyState from '@/components/EmptyState';
+import PullToRefresh from '@/components/PullToRefresh';
 import { useToast } from '@/components/Toast';
 
 export interface FeedItem {
@@ -22,6 +23,7 @@ export interface FeedItem {
   tags?: string[];
   dimension_scores?: Record<string, number>;
   is_public?: boolean;
+  is_bookmarked?: boolean;
   // 分步处理状态
   failed_phases?: string[];    // 后端返回的失败阶段列表
   _pending?: boolean;
@@ -370,6 +372,34 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
     }
   }, [showToast]);
 
+  // 切换收藏状态
+  const handleToggleBookmark = useCallback(async (id: string, isBookmarked: boolean) => {
+    try {
+      const token = localStorage.getItem('vibingu_token');
+      const res = await fetch(`/api/feed/${id}/bookmark`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ is_bookmarked: isBookmarked }),
+      });
+      if (res.ok) {
+        const item = feedDataRef.current.get(id);
+        if (item) {
+          feedDataRef.current.set(id, { ...item, is_bookmarked: isBookmarked });
+          setFeedIds(prev => [...prev]); // 触发重渲染
+        }
+        showToast('success', isBookmarked ? '已收藏' : '已取消收藏');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        showToast('error', errorData.detail || '操作失败');
+      }
+    } catch {
+      showToast('error', '网络错误，请重试');
+    }
+  }, [showToast]);
+
   // 从 Map 获取 items 列表传给子组件
   const feedItems = feedIds.map(id => feedDataRef.current.get(id)).filter(Boolean) as FeedItem[];
 
@@ -380,7 +410,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
         <p className="text-sm text-[var(--text-tertiary)] mt-1">记录生活的每一个瞬间</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-32 -mx-1 px-1">
+      <PullToRefresh onRefresh={fetchHistory} className="flex-1 overflow-y-auto pb-32 -mx-1 px-1">
         {isFirstLoad ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
@@ -402,6 +432,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
             items={feedItems} 
             onDelete={handleDelete}
             onTogglePublic={handleTogglePublic}
+            onToggleBookmark={handleToggleBookmark}
             onDismissFailed={handleDismissFailed}
             onRetryFailed={handleRetryFailed}
             onRegenerate={handleRegenerate}
@@ -410,7 +441,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
         ) : (
           <EmptyState />
         )}
-      </div>
+      </PullToRefresh>
 
       <div className="fixed bottom-0 left-0 right-0 md:left-[72px] p-4 pb-6 
                       bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)]/95 to-transparent z-30">
