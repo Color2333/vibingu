@@ -158,6 +158,7 @@ async def create_feed(
                     content_hint=classification_result.get("content_hint") if classification_result else None,
                     client_time=client_time,
                     nickname=nickname,
+                    category_suggestion=classification_result.get("category_suggestion") if classification_result else None,
                 )
             else:
                 extract_result = await data_extractor.extract(
@@ -435,6 +436,7 @@ async def create_feed_stream(
                         content_hint=classification_result.get("content_hint") if classification_result else None,
                         client_time=client_time,
                         nickname=nickname,
+                        category_suggestion=classification_result.get("category_suggestion") if classification_result else None,
                     )
                 else:
                     extract_result = await data_extractor.extract(

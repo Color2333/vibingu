@@ -173,12 +173,14 @@ class DataExtractor:
         content_hint: Optional[str] = None,
         client_time: Optional[str] = None,
         nickname: Optional[str] = None,
+        category_suggestion: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         根据图片类型提取数据 + 深度分析
         
         Args:
             nickname: 用户昵称，AI 回复时用此称呼代替"用户"
+            category_suggestion: 图片分类器给出的分类建议，用于智能路由
         
         Returns:
             {
@@ -187,7 +189,6 @@ class DataExtractor:
                 "reply_text": str
             }
         """
-        # 保存昵称供 _call_ai 使用（线程安全：每次 extract 调用独立设置）
         self._nickname = nickname
         
         if not self.client:
@@ -198,9 +199,14 @@ class DataExtractor:
             if not image_base64:
                 return await self._extract_text_only(text, client_time)
             
-            # 有图片的情况
+            # 有图片：根据 image_type + category_suggestion 智能路由
+            # screenshot 类型需要二次判断：只有 SCREEN 分类建议才走屏幕时间提取
+            # 其他截图（如聊天记录、工作截图等）走通用提取
             if image_type == "screenshot":
-                return await self._extract_screen_time(image_base64, text, client_time)
+                if category_suggestion and category_suggestion.upper() == "SCREEN":
+                    return await self._extract_screen_time(image_base64, text, client_time)
+                else:
+                    return await self._extract_general(image_base64, text, image_type, client_time)
             elif image_type == "activity_screenshot":
                 return await self._extract_activity_data(image_base64, text, client_time)
             elif image_type == "food":
@@ -487,6 +493,7 @@ class DataExtractor:
             "activity_photo": "ACTIVITY",
             "scenery": "MOOD",
             "selfie": "MOOD",
+            "screenshot": "MOOD",
             "other": "MOOD",
         }
         
@@ -494,15 +501,16 @@ class DataExtractor:
             "activity_photo": "运动",
             "scenery": "风景",
             "selfie": "自拍",
+            "screenshot": "截图",
             "other": "生活",
         }.get(image_type, "生活")
         
-        system_prompt = f"""你是 Vibing u 的生活记录助手，擅长从照片中洞察用户状态。
+        system_prompt = f"""你是 Vibing u 的生活记录助手，擅长从各种照片和截图中洞察用户状态。
 当前时间：{current_time}（{time_period}）
 
-请分析这张{image_type_zh}照片，并：
-1. 判断这张照片最适合的分类
-2. 描述照片内容
+请分析这张{image_type_zh}，并：
+1. 判断这张图最适合的分类（截图可以是聊天记录、工作内容、学习笔记、社交动态等任何内容）
+2. 提取和描述关键内容
 3. 推测用户当时的情绪和状态
 4. 给出一句温暖的回复
 
