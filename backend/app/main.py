@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
@@ -121,12 +122,14 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_migrations()  # 运行数据库迁移
 
-    # 自动补充 RAG 索引
-    auto_index_rag()
+    # 异步补充 RAG 索引（不阻塞启动）
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, auto_index_rag)
+    logger.info("RAG 索引检查已在后台启动")
 
     yield
     # 关闭时的清理工作（如需要）
-
 
 app = FastAPI(
     title="Vibing u API",
@@ -143,6 +146,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
+
+# GZip 压缩 - 减少传输体积（min_size=500 字节以上才压缩）
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # 注册路由
 app.include_router(feed_router)

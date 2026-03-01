@@ -67,6 +67,59 @@ class VibeCalculator:
             logger.info(f"Vibe {target_date}: LLM 评分不足({len(llm_scored_records)}/{len(records)})，使用规则引擎")
             return self._calculate_from_rules(records, target_date)
     
+    def calculate_vibe_from_records(self, records: list) -> Optional[int]:
+        """
+        从已加载的记录列表计算 vibe score，不发起额外 DB 查询。
+        用于 trend API 批量计算场景。
+        """
+        if not records:
+            return None
+        
+        llm_scored_records = [
+            r for r in records
+            if r.dimension_scores and isinstance(r.dimension_scores, dict) and len(r.dimension_scores) >= 4
+        ]
+        
+        if llm_scored_records and len(llm_scored_records) >= len(records) * 0.5:
+            # LLM 模式：加权平均
+            dim_totals: Dict[str, list] = {dim: [] for dim in DIMENSIONS}
+            for record in llm_scored_records:
+                for dim, score in record.dimension_scores.items():
+                    if dim in dim_totals and isinstance(score, (int, float)) and score > 0:
+                        dim_totals[dim].append(float(score))
+            
+            dim_averages = {}
+            for dim in DIMENSIONS:
+                scores = dim_totals[dim]
+                dim_averages[dim] = sum(scores) / len(scores) if scores else 50.0
+            
+            total_weight = sum(d["weight"] for d in DIMENSIONS.values())
+            vibe_score = sum(
+                dim_averages[dim] * DIMENSIONS[dim]["weight"]
+                for dim in DIMENSIONS
+            ) / total_weight
+            return round(vibe_score)
+        else:
+            # 规则引擎 fallback：简化计算
+            def _cat_match(r, cat):
+                if r.category == cat:
+                    return True
+                if r.sub_categories and cat in r.sub_categories:
+                    return True
+                return False
+            
+            WEIGHTS = {"sleep": 0.40, "diet": 0.25, "screen": 0.20, "activity": 0.15}
+            scores = {
+                "sleep": self._rule_sleep_score([r for r in records if _cat_match(r, "SLEEP")]),
+                "diet": self._rule_diet_score([r for r in records if _cat_match(r, "DIET")]),
+                "screen": self._rule_screen_score([r for r in records if _cat_match(r, "SCREEN")]),
+                "activity": self._rule_activity_score([r for r in records if _cat_match(r, "ACTIVITY")]),
+            }
+            valid_scores = {k: v for k, v in scores.items() if v is not None}
+            if not valid_scores:
+                return None
+            total_weight = sum(WEIGHTS[k] for k in valid_scores)
+            return round(sum(v * (WEIGHTS[k] / total_weight) for k, v in valid_scores.items()))
     def _calculate_from_dimensions(
         self,
         all_records: List[LifeStream],

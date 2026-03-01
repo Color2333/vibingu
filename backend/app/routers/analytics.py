@@ -74,9 +74,7 @@ async def get_today_vibe(
     
     calculator = VibeCalculator(db)
     vibe_data = calculator.calculate_daily_vibe(target_date)
-    
-    # 同时更新 daily_summary
-    calculator.update_daily_summary(target_date)
+    # NOTE: 不再在 GET 请求中写 daily_summary，改由 POST /recalculate 或创建记录时触发
     
     return _build_vibe_response(target_date, vibe_data)
 
@@ -99,9 +97,7 @@ async def get_vibe_score(
     
     calculator = VibeCalculator(db)
     vibe_data = calculator.calculate_daily_vibe(target_date)
-    
-    # 同时更新 daily_summary
-    calculator.update_daily_summary(target_date)
+    # NOTE: 不再在 GET 请求中写 daily_summary，改由 POST /recalculate 或创建记录时触发
     
     return _build_vibe_response(target_date, vibe_data)
 
@@ -114,10 +110,9 @@ async def get_vibe_trend(
 ):
     """
     获取最近 N 天的 Vibing Index 趋势（以 end_date 为终点倒推 N 天）
-    """
-    calculator = VibeCalculator(db)
-    trend = []
     
+    优化：一次性查询整个日期范围的记录，内存中按日分组计算，避免 N+1 查询
+    """
     if end_date:
         try:
             base_date = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -126,13 +121,37 @@ async def get_vibe_trend(
     else:
         base_date = date.today()
     
+    # 一次性查出整个日期范围的所有记录
+    start_date = base_date - timedelta(days=days - 1)
+    start_time = datetime.combine(start_date, datetime.min.time())
+    end_time = datetime.combine(base_date + timedelta(days=1), datetime.min.time())
+    
+    all_records = db.query(LifeStream).filter(
+        and_(
+            LifeStream.created_at >= start_time,
+            LifeStream.created_at < end_time,
+        )
+    ).all()
+    
+    # 按日期分组
+    from collections import defaultdict
+    records_by_date: dict[date, list] = defaultdict(list)
+    for r in all_records:
+        record_date = r.created_at.date() if r.created_at else None
+        if record_date:
+            records_by_date[record_date].append(r)
+    
+    # 批量计算每天的 vibe score（纯内存计算，无额外 DB 查询）
+    calculator = VibeCalculator(db)
+    trend = []
     for i in range(days):
         target_date = base_date - timedelta(days=i)
-        vibe_data = calculator.calculate_daily_vibe(target_date)
-        trend.append(TrendDataPoint(
-            date=target_date,
-            vibe_score=vibe_data["vibe_score"],
-        ))
+        day_records = records_by_date.get(target_date, [])
+        if not day_records:
+            trend.append(TrendDataPoint(date=target_date, vibe_score=None))
+            continue
+        vibe_score = calculator.calculate_vibe_from_records(day_records)
+        trend.append(TrendDataPoint(date=target_date, vibe_score=vibe_score))
     
     # 按日期正序返回
     trend.reverse()

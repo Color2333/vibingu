@@ -56,7 +56,7 @@ export default function RecordPage({ refreshKey }: RecordPageProps) {
   const fetchHistory = useCallback(async () => {
     try {
       setLoadError(null);
-      const response = await fetch('/api/feed/history?limit=50');
+      const response = await fetch('/api/feed/history?limit=20');
       if (response.ok) {
         const data: FeedItem[] = await response.json();
         // 重置 Map 和 ID 列表（保留未完成的 temp 项）

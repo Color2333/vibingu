@@ -1,17 +1,41 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Sidebar, { PageId } from '@/components/Sidebar';
 import RecordPage from '@/components/pages/RecordPage';
-import AnalyticsPage from '@/components/pages/AnalyticsPage';
-import InsightsPage from '@/components/pages/InsightsPage';
-import AchievementsPage from '@/components/pages/AchievementsPage';
-import SettingsPage from '@/components/pages/SettingsPage';
-import ChatPage from '@/components/pages/ChatPage';
 import LoginScreen from '@/components/LoginScreen';
 import PublicFeedPage from '@/components/pages/PublicFeedPage';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
+
+// 懒加载非首屏页面 — 减少初始 JS bundle 体积（recharts 等重依赖延迟加载）
+const AnalyticsPage = dynamic(() => import('@/components/pages/AnalyticsPage'), {
+  loading: () => <PageSkeleton />,
+});
+const InsightsPage = dynamic(() => import('@/components/pages/InsightsPage'), {
+  loading: () => <PageSkeleton />,
+});
+const AchievementsPage = dynamic(() => import('@/components/pages/AchievementsPage'), {
+  loading: () => <PageSkeleton />,
+});
+const SettingsPage = dynamic(() => import('@/components/pages/SettingsPage'), {
+  loading: () => <PageSkeleton />,
+});
+const ChatPage = dynamic(() => import('@/components/pages/ChatPage'), {
+  loading: () => <PageSkeleton />,
+});
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-8 w-48 bg-[var(--glass-bg)] rounded-xl" />
+      <div className="h-4 w-32 bg-[var(--glass-bg)] rounded-lg" />
+      <div className="h-64 bg-[var(--glass-bg)] rounded-2xl mt-6" />
+      <div className="h-48 bg-[var(--glass-bg)] rounded-2xl" />
+    </div>
+  );
+}
 
 // 需要保持状态的页面（切换后不卸载）
 const KEEP_ALIVE_PAGES: PageId[] = ['record', 'chat'];
