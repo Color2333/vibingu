@@ -242,6 +242,7 @@ export default function ChatPage() {
       let accumulated = '';
       let buffer = '';
       let newConvId: string | null = null;
+      let hasError = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -277,6 +278,24 @@ export default function ChatPage() {
               continue;
             }
 
+            // 处理错误事件
+            if (data.error) {
+              hasError = true;
+              // 清空 streaming 状态
+              setStreamingContent('');
+              // 添加错误消息
+              const errorMsg: Message = {
+                id: `temp-err-${Date.now()}`,
+                role: 'assistant',
+                content: data.error || 'AI 响应失败，请稍后重试',
+                created_at: new Date().toISOString(),
+              };
+              setMessages((prev) => [...prev, errorMsg]);
+              // 清空 accumulated 避免在 finally 中重复添加
+              accumulated = '';
+              break;
+            }
+
             if (data.done) break;
             if (data.content) {
               accumulated += data.content;
@@ -290,7 +309,7 @@ export default function ChatPage() {
 
       // 流结束后：用最终内容替换 streaming 状态
       setStreamingContent('');
-      if (accumulated) {
+      if (accumulated && !hasError) {
         const assistantMsg: Message = {
           id: `temp-assistant-${Date.now()}`,
           role: 'assistant',
@@ -298,7 +317,7 @@ export default function ChatPage() {
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);
-      } else {
+      } else if (!hasError) {
         setMessages((prev) => [
           ...prev,
           {

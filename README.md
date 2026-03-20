@@ -4,7 +4,7 @@
 
 个人生活数据黑匣子 —— 建立你的生活数据集，用 AI 寻找「最佳状态」的源代码。
 
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Version](https://img.shields.io/badge/version-0.5.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://img.shields.io/badge/tests-70%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
@@ -25,6 +25,27 @@
 ```
 
 ## Features
+
+### v0.5 新功能 ✨
+
+#### 对话与社交
+- **对话持久化** - AI 对话历史自动保存，支持多会话管理
+- **流式响应** - AI 回复实时流式输出，无需等待
+- **公开动态** - 关注其他用户，浏览社区公开记录
+
+#### 智能分析
+- **分阶段 AI 解析** - tags → dimension → AI insight 逐步深入
+- **八维度 Vibing Index** - 基于 PERMA-V+ 模型的多维评分
+- **多标签支持** - sub_categories 细粒度分类
+- **全局搜索** - RAG 语义搜索 + 历史记录搜索
+
+#### 收藏与筛选
+- **Bookmark 收藏** - 收藏重要记录，快速查阅
+- **日期范围筛选** - 自定义时间区间，精确定位数据
+
+#### 移动端优化
+- **下拉刷新** - PullToRefresh 手势支持
+- **触摸目标增大** - 所有按钮符合 44px 最小触摸标准
 
 ### v0.3 新功能 ✨
 
@@ -275,6 +296,16 @@ vibingu/
 
 ## Roadmap
 
+### Completed (v0.5)
+- [x] 对话持久化 + 流式响应
+- [x] 八维度 Vibing Index 评分
+- [x] 分阶段 AI 解析 (tags → dimension → insight)
+- [x] sub_categories 多标签分类
+- [x] RAG 语义搜索 + 全局搜索
+- [x] Bookmark 收藏功能
+- [x] 日期范围筛选
+- [x] 移动端手势优化 (PullToRefresh)
+
 ### Completed (v0.3)
 - [x] 浅色/深色主题系统
 - [x] 数据隐私控制（公开/私密）
@@ -301,11 +332,16 @@ vibingu/
   - [x] 成就徽章
 
 ### Planned
-- [ ] 云图床接入 (Cloudflare R2)
+- [ ] 云图床接入 (Cloudflare R2 / S3)
 - [ ] Docker 部署
 - [ ] CI/CD 流水线
 - [ ] 多设备数据同步
 - [ ] 性能优化
+- [ ] 智能提醒 / AI 日报
+- [ ] 语音输入
+- [ ] 周报 / 月报生成
+- [ ] 对比视图 / 日历视图
+- [ ] 第三方接入 (Notion, Linear 等)
 
 ## Environment Variables
 
@@ -337,4 +373,4 @@ MIT License - feel free to use and modify.
 
 *Built with ❤️ for a better life. 你的生活，值得被深度理解。*
 
-**v0.3.0** | 2025
+**v0.5.2** | 2025

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Download, FileText, Menu, X, RefreshCw, Eye, LogOut, Calendar, Brain, Search, Clock, Bookmark } from 'lucide-react';
+import { Download, FileText, Menu, X, RefreshCw, Eye, LogOut, Calendar, Brain, Search, Clock, Bookmark, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +26,7 @@ interface HeaderProps {
 export default function Header({ onRefresh, onLogout }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -102,6 +103,7 @@ export default function Header({ onRefresh, onLogout }: HeaderProps) {
 
   const handleExport = async (format: 'json' | 'csv') => {
     setIsExporting(true);
+    setExportError(null);
     try {
       const response = await fetch(`/api/reports/export?format=${format}`);
       if (response.ok) {
@@ -129,10 +131,11 @@ export default function Header({ onRefresh, onLogout }: HeaderProps) {
         }
       }
     } catch (error) {
-      console.error('导出失败:', error);
+      setExportError(error instanceof Error ? error.message : '导出失败，请重试');
     } finally {
       setIsExporting(false);
       setShowMenu(false);
+      setTimeout(() => setExportError(null), 3000);
     }
   };
 
@@ -252,6 +255,13 @@ export default function Header({ onRefresh, onLogout }: HeaderProps) {
 
             {/* Dropdown */}
             <div className="absolute right-0 top-full mt-2 w-48 glass rounded-2xl py-2 z-50 animate-scale-in">
+              {exportError && (
+                <div className="mx-2 mb-2 px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{exportError}</span>
+                </div>
+              )}
+
               <Link
                 href="/public"
                 onClick={() => setShowMenu(false)}

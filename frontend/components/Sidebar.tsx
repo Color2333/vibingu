@@ -137,7 +137,7 @@ export default function Sidebar({ currentPage, onPageChange, onLogout }: Sidebar
         </div>
 
         {/* 导航项 */}
-        <nav className="flex-1 py-4 px-3 space-y-1">
+        <nav className="flex-1 py-4 px-3 space-y-2">
           {navItems.map((item) => {
             const isActive = currentPage === item.id;
             return (
