@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Mic, MicOff, Send, X, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Camera, Mic, MicOff, Send, X, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -77,6 +77,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -188,6 +189,9 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
 
   const handleSubmit = async () => {
     if (!text.trim() && !image) return;
+
+    // Clear any previous error
+    setLocalError(null);
 
     const currentText = text.trim();
     const currentImagePreview = imagePreview;
@@ -305,6 +309,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
       if (onError) {
         onError(errorMsg);
       }
+      setLocalError(errorMsg);
     } finally {
       setIsSubmitting(false);
       onLoading(false);
@@ -364,7 +369,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all btn"
+            className="p-3 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all btn"
             disabled={isSubmitting}
           >
             <ImageIcon className="w-5 h-5" />
@@ -380,14 +385,14 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           />
           <label
             htmlFor="camera-input"
-            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all cursor-pointer md:hidden btn"
+            className="p-3 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-all cursor-pointer md:hidden btn"
           >
             <Camera className="w-5 h-5" />
           </label>
 
           <button
             onClick={toggleRecording}
-            className={`p-2 rounded-lg transition-all btn ${
+            className={`p-3 rounded-lg transition-all btn ${
               isRecording
                 ? 'text-red-400 bg-red-500/10'
                 : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]'
@@ -400,7 +405,7 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || (!text.trim() && !image)}
-            className="p-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-all btn disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-all btn disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -410,6 +415,17 @@ export default function MagicInputBar({ onSuccess, onLoading, onOptimisticAdd, o
           </button>
         </div>
       </div>
+
+      {/* Error display */}
+      {localError && (
+        <div className="mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{localError}</span>
+          <button onClick={() => setLocalError(null)} className="ml-auto">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

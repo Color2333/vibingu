@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { SmilePlus, RefreshCw } from 'lucide-react';
+import { SmilePlus, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface MoodItem {
   mood: string;
@@ -25,10 +25,17 @@ const MOOD_CONFIG: Record<string, { label: string; emoji: string; color: string;
 export default function MoodDistribution({ days = 30 }: { days?: number }) {
   const [moods, setMoods] = useState<MoodItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState(days);
+
+  // Sync period state when days prop changes
+  useEffect(() => {
+    setPeriod(days);
+  }, [days]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/time/mood-distribution?days=${period}`);
       if (res.ok) {
@@ -36,9 +43,14 @@ export default function MoodDistribution({ days = 30 }: { days?: number }) {
         // API may return { moods: [...] } or array directly
         const items: MoodItem[] = Array.isArray(data) ? data : (data.moods || data.distribution || []);
         setMoods(items.sort((a, b) => b.count - a.count));
+      } else {
+        const errorMsg = `请求失败: ${res.status}`;
+        setError(errorMsg);
+        console.error(errorMsg);
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setError('加载失败');
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -76,6 +88,7 @@ export default function MoodDistribution({ days = 30 }: { days?: number }) {
               <button
                 key={d}
                 onClick={() => setPeriod(d)}
+                type="button"
                 className={`px-2.5 py-1 transition-colors ${
                   period === d
                     ? 'bg-pink-500/20 text-pink-400'
@@ -88,14 +101,31 @@ export default function MoodDistribution({ days = 30 }: { days?: number }) {
           </div>
           <button
             onClick={fetchData}
-            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+            disabled={loading}
+            type="button"
+            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {moods.length === 0 ? (
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-3">
+            <AlertCircle className="w-6 h-6 text-red-400" />
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-3">{error}</p>
+          <button
+            onClick={fetchData}
+            type="button"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            重新加载
+          </button>
+        </div>
+      ) : moods.length === 0 ? (
         <div className="text-center py-6 text-sm text-[var(--text-tertiary)]">
           暂无情绪数据
         </div>

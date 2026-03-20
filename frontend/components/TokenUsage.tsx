@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Zap, TrendingUp, AlertTriangle, PieChart, RefreshCw, Activity, Clock, ChevronDown, ChevronUp, Cpu, MessageSquare, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Zap, TrendingUp, AlertTriangle, PieChart, RefreshCw, Activity, Clock, ChevronDown, ChevronUp, Cpu, MessageSquare, ArrowUpRight, ArrowDownRight, AlertCircle } from 'lucide-react';
 
 // ========== 类型 ==========
 
@@ -137,6 +137,7 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
   const [data, setData] = useState<DetailedSummary | null>(null);
   const [trend, setTrend] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(expanded);
   const [detailTab, setDetailTab] = useState<'model' | 'task' | 'recent'>('task');
 
@@ -144,18 +145,26 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
 
   const fetchAll = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [detailRes, trendRes] = await Promise.all([
         fetch('/api/tokens/detailed-summary'),
         fetch('/api/tokens/trend?days=14'),
       ]);
-      if (detailRes.ok) setData(await detailRes.json());
+      if (detailRes.ok) {
+        setData(await detailRes.json());
+      } else {
+        setError('加载数据失败，请稍后重试');
+      }
       if (trendRes.ok) {
         const t = await trendRes.json();
         setTrend(t.trend || []);
+      } else {
+        setError('加载数据失败，请稍后重试');
       }
     } catch (e) {
       console.error('Failed to fetch token usage:', e);
+      setError('加载失败，请检查网络后重试');
     } finally {
       setLoading(false);
     }
@@ -188,7 +197,46 @@ export default function TokenUsage({ className = '', expanded = false }: Props) 
     );
   }
 
-  if (!data) return null;
+  if (error) {
+    return (
+      <div className={`glass-card p-4 ${className}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-400" />
+            <h3 className="text-sm font-medium text-[var(--text-primary)]">AI 用量统计</h3>
+          </div>
+          <button onClick={fetchAll} className="p-1.5 rounded-lg hover:bg-[var(--glass-bg)] transition-colors" title="重试">
+            <RefreshCw className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+          </button>
+        </div>
+        <div className="py-8 text-center">
+          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+          <p className="text-sm text-[var(--text-secondary)] mb-4">{error}</p>
+          <button
+            onClick={fetchAll}
+            className="px-4 py-2 text-xs font-medium bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-lg border border-[var(--border)] hover:bg-[var(--bg-secondary)] transition-colors"
+          >
+            重试
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className={`glass-card p-4 ${className}`}>
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="w-4 h-4 text-amber-400" />
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">AI 用量统计</h3>
+        </div>
+        <div className="py-8 text-center">
+          <PieChart className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-3" />
+          <p className="text-sm text-[var(--text-tertiary)]">暂无数据</p>
+        </div>
+      </div>
+    );
+  }
 
   const periods: { key: 'today' | 'week' | 'month'; label: string; icon: string }[] = [
     { key: 'today', label: '今日', icon: '📅' },

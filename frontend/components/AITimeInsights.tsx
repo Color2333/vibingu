@@ -11,7 +11,8 @@ import {
   Moon,
   Zap,
   RefreshCw,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react';
 
 interface TimeInsights {
@@ -59,14 +60,21 @@ export default function AITimeInsights() {
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState<'insights' | 'schedule' | 'reminders'>('insights');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [insightsRes, remindersRes] = await Promise.all([
         fetch('/api/time/ai-insights?days=30'),
         fetch('/api/time/smart-reminders'),
       ]);
+
+      if (!insightsRes.ok) {
+        const errorData = await insightsRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Insights API error: ${insightsRes.status}`);
+      }
 
       if (insightsRes.ok) {
         setInsights(await insightsRes.json());
@@ -77,13 +85,14 @@ export default function AITimeInsights() {
       setGenerated(true);
     } catch (error) {
       console.error('Failed to fetch time insights:', error);
+      setError(error instanceof Error ? error.message : '加载失败，请检查网络后重试');
     } finally {
       setLoading(false);
     }
   };
 
   // 未生成状态
-  if (!generated) {
+  if (!generated && !loading && !error) {
     return (
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -127,6 +136,37 @@ export default function AITimeInsights() {
     );
   }
 
+  // 错误状态 - 作为第一个检查
+  if (error) {
+    return (
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-xl bg-violet-500/20">
+            <Clock className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">时间智能分析</h3>
+            <p className="text-xs text-[var(--text-tertiary)]">AI 驱动的时间模式洞察</p>
+          </div>
+        </div>
+        <div className="text-center py-6">
+          <div className="p-3 rounded-full bg-red-500/10 mx-auto w-16 h-16 flex items-center justify-center mb-4">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-1">加载失败</p>
+          <p className="text-xs text-[var(--text-tertiary)] mb-4">{error}</p>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 text-sm font-medium transition-colors flex items-center gap-2 mx-auto"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            重新加载
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!insights?.has_data) {
     return (
       <div className="glass-card p-6">
@@ -165,9 +205,10 @@ export default function AITimeInsights() {
         </div>
         <button
           onClick={fetchData}
-          className="p-2 rounded-lg hover:bg-[var(--glass-bg)] transition-colors"
+          disabled={loading}
+          className="p-2 rounded-lg hover:bg-[var(--glass-bg)] transition-colors disabled:opacity-50"
         >
-          <RefreshCw className="w-4 h-4 text-[var(--text-tertiary)]" />
+          <RefreshCw className={`w-4 h-4 text-[var(--text-tertiary)] ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 

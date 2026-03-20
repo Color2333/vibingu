@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Heart, Brain, Users, Briefcase, BookOpen, Target, Smartphone, Gamepad2, TrendingUp, TrendingDown, Minus, RefreshCw, Activity } from 'lucide-react';
+import { Heart, Brain, Users, Briefcase, BookOpen, Target, Smartphone, Gamepad2, TrendingUp, TrendingDown, Minus, RefreshCw, Activity, Loader2, XCircle } from 'lucide-react';
 
 interface VibeData {
   date: string;
@@ -45,19 +45,46 @@ export default function TodaySnapshot({ date }: { date?: string }) {
   const [vibeData, setVibeData] = useState<VibeData | null>(null);
   const [dimData, setDimData] = useState<DimensionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const dateParam = date ? `?date=${date}` : '';
     try {
-      const [vibeRes, dimRes] = await Promise.all([
+      const [vibeRes, dimRes] = await Promise.allSettled([
         fetch(`/api/analytics/vibe/today${dateParam}`),
         fetch(`/api/analytics/dimensions/today${dateParam}`),
       ]);
-      if (vibeRes.ok) setVibeData(await vibeRes.json());
-      if (dimRes.ok) setDimData(await dimRes.json());
-    } catch {
-      /* ignore */
+
+      if (vibeRes.status === 'fulfilled') {
+        const res = vibeRes.value;
+        if (res.ok) {
+          setVibeData(await res.json());
+        } else {
+          console.error(`Vibe API error: ${res.status} ${res.statusText}`);
+        }
+      } else {
+        console.error('Vibe fetch failed:', vibeRes.reason);
+      }
+
+      if (dimRes.status === 'fulfilled') {
+        const res = dimRes.value;
+        if (res.ok) {
+          setDimData(await res.json());
+        } else {
+          console.error(`Dimensions API error: ${res.status} ${res.statusText}`);
+        }
+      } else {
+        console.error('Dimensions fetch failed:', dimRes.reason);
+      }
+
+      if (vibeRes.status === 'rejected' && dimRes.status === 'rejected') {
+        setError('加载失败');
+      }
+    } catch (e) {
+      setError('加载失败');
+      console.error('Failed to fetch today snapshot:', e);
     } finally {
       setLoading(false);
     }
@@ -78,10 +105,38 @@ export default function TodaySnapshot({ date }: { date?: string }) {
     );
   }
 
+  if (error) {
+    return (
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20">
+              <Activity className="w-4 h-4 text-indigo-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">今日快照</h3>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 gap-4">
+          <div className="flex items-center gap-2 text-red-400/80">
+            <XCircle className="w-5 h-5" />
+            <span className="text-sm">{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchData}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            重试
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const vibeScore = vibeData?.vibe_score ?? null;
   const recordCount = vibeData?.record_count ?? dimData?.record_count ?? 0;
 
-  // Sorted dimensions from dimData
   const sortedDims = dimData?.dimensions
     ? Object.entries(dimData.dimensions).sort(([, a], [, b]) => b.score - a.score)
     : [];
@@ -104,7 +159,6 @@ export default function TodaySnapshot({ date }: { date?: string }) {
     return '偏低';
   };
 
-  // SVG circle props
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const progress = vibeScore !== null ? (vibeScore / 100) * circumference : 0;
@@ -127,18 +181,26 @@ export default function TodaySnapshot({ date }: { date?: string }) {
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">今日快照</h3>
         </div>
         <button
+          type="button"
           onClick={fetchData}
-          className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
+          disabled={loading}
+          className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="刷新数据"
+          title="刷新数据"
         >
-          <RefreshCw className="w-4 h-4" />
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
         </button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-6">
-        {/* Left: Vibe Score Ring */}
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="relative w-32 h-32">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <title>Vibe Score Ring</title>
               <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--glass-bg)" strokeWidth="8" />
               {vibeScore !== null && (
                 <circle
@@ -163,7 +225,6 @@ export default function TodaySnapshot({ date }: { date?: string }) {
           <span className="text-[10px] text-[var(--text-tertiary)] mt-2 uppercase tracking-wider">Vibe Score</span>
         </div>
 
-        {/* Right: 8 Dimension Bars */}
         <div className="flex-1 min-w-0 space-y-2">
           {sortedDims.length > 0 ? sortedDims.map(([key, dim]) => {
             const cfg = DIM_CONFIG[key];
@@ -191,7 +252,6 @@ export default function TodaySnapshot({ date }: { date?: string }) {
         </div>
       </div>
 
-      {/* Bottom Summary Badges */}
       <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <span className="text-xs px-2.5 py-1 rounded-full bg-[var(--glass-bg)] text-[var(--text-tertiary)] flex items-center gap-1">
           {recordCount} 条记录

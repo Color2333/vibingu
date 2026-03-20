@@ -387,9 +387,14 @@ class RAGService:
                 max_tokens=2000,
                 temperature=0.7
             )
-            
-            answer = response.choices[0].message.content
-            
+
+            if not response.choices:
+                raise Exception(f"AI 返回空结果 (model={self.smart_model})")
+            choice = response.choices[0]
+            if not choice.message or not choice.message.content:
+                raise Exception("AI 返回内容为空")
+            answer = choice.message.content
+
             return {
                 "answer": answer,
                 "sources": [
@@ -597,11 +602,17 @@ class RAGService:
                 max_tokens=2000,
                 temperature=0.7
             )
-            
+
+            if not response.choices:
+                raise Exception(f"AI 返回空结果 (model={self.smart_model})")
+            choice = response.choices[0]
+            if not choice.message or not choice.message.content:
+                raise Exception("AI 返回内容为空")
+
             return {
                 "has_data": True,
                 "topic": topic,
-                "summary": response.choices[0].message.content,
+                "summary": choice.message.content,
                 "record_count": len(search_results),
                 "date_range": {
                     "earliest": min(by_date.keys()) if by_date else None,
@@ -671,11 +682,17 @@ class RAGService:
                 max_tokens=2000,
                 temperature=0.7
             )
-            
+
+            if not response.choices:
+                raise Exception(f"AI 返回空结果 (model={self.smart_model})")
+            choice = response.choices[0]
+            if not choice.message or not choice.message.content:
+                raise Exception("AI 返回内容为空")
+
             return {
                 "has_data": True,
                 "period_days": period_days,
-                "insights": response.choices[0].message.content,
+                "insights": choice.message.content,
                 "dimensions_analyzed": [i["dimension"] for i in insights],
                 "total_records": sum(i["record_count"] for i in insights)
             }

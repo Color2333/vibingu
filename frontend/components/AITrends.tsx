@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Minus, Activity, RefreshCw, Link2, Sparkles } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, RefreshCw, Link2, Sparkles, AlertCircle } from 'lucide-react';
 
 interface Pattern {
   name: string;
@@ -58,22 +58,44 @@ export default function AITrends({ className = '' }: Props) {
   const [data, setData] = useState<TrendsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchTrends = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/ai/trends?days=30');
       if (res.ok) {
         const trends = await res.json();
         setData(trends);
         setGenerated(true);
+      } else {
+        setError(`请求失败: ${res.status}`);
       }
     } catch (error) {
       console.error('Failed to fetch AI trends:', error);
+      setError('加载失败，请检查网络后重试');
     } finally {
       setLoading(false);
     }
   };
+
+  // Error state: show error UI with retry button
+  if (error) {
+    return (
+      <div className={`glass-card p-6 ${className}`}>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI 趋势分析</h3>
+        </div>
+        <div className="text-center py-8">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-red-400 mb-2">{error}</p>
+          <button onClick={() => { setError(null); fetchTrends(); }} className="text-sm text-cyan-400">重试</button>
+        </div>
+      </div>
+    );
+  }
 
   // 未生成状态：显示提示 + 按钮
   if (!generated) {
@@ -147,7 +169,7 @@ export default function AITrends({ className = '' }: Props) {
           )}
         </div>
         <button
-          onClick={fetchTrends}
+          onClick={() => { setError(null); fetchTrends(); }}
           disabled={loading}
           className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] rounded-lg transition-colors"
           title="重新生成（消耗 Token）"

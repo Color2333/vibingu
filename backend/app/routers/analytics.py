@@ -2,7 +2,8 @@
 分析 API - Vibing Index 和关联分析
 """
 
-from fastapi import APIRouter, Depends, Query
+import logging
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from typing import List, Optional
@@ -15,6 +16,8 @@ from app.services.vibe_calculator import VibeCalculator
 from app.services.dimension_analyzer import get_dimension_analyzer, DIMENSIONS
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+logger = logging.getLogger(__name__)
 
 
 class VibeScoreResponse(BaseModel):
@@ -47,6 +50,15 @@ class CorrelationResult(BaseModel):
 
 def _build_vibe_response(target_date: date, vibe_data: dict) -> VibeScoreResponse:
     """统一构建 VibeScoreResponse，兼容 LLM 和规则引擎两种模式"""
+    if vibe_data is None:
+        return VibeScoreResponse(
+            date=target_date,
+            vibe_score=None,
+            dimension_averages=None,
+            insights=[],
+            record_count=0,
+            scoring_mode="none",
+        )
     return VibeScoreResponse(
         date=target_date,
         vibe_score=vibe_data.get("vibe_score"),
@@ -67,15 +79,18 @@ async def get_today_vibe(
         try:
             target_date = datetime.strptime(date_param, "%Y-%m-%d").date()
         except ValueError:
-            from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     else:
         target_date = date.today()
-    
+
     calculator = VibeCalculator(db)
-    vibe_data = calculator.calculate_daily_vibe(target_date)
+    try:
+        vibe_data = calculator.calculate_daily_vibe(target_date)
+    except Exception as e:
+        logger.exception("计算每日 vibe 失败")
+        raise HTTPException(status_code=500, detail="计算评分失败，请稍后重试")
     # NOTE: 不再在 GET 请求中写 daily_summary，改由 POST /recalculate 或创建记录时触发
-    
+
     return _build_vibe_response(target_date, vibe_data)
 
 
@@ -86,19 +101,22 @@ async def get_vibe_score(
 ):
     """
     获取指定日期的 Vibing Index
-    
+
     - **date_str**: 日期字符串，格式 YYYY-MM-DD
     """
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
-    
+
     calculator = VibeCalculator(db)
-    vibe_data = calculator.calculate_daily_vibe(target_date)
+    try:
+        vibe_data = calculator.calculate_daily_vibe(target_date)
+    except Exception as e:
+        logger.exception("计算每日 vibe 失败")
+        raise HTTPException(status_code=500, detail="计算评分失败，请稍后重试")
     # NOTE: 不再在 GET 请求中写 daily_summary，改由 POST /recalculate 或创建记录时触发
-    
+
     return _build_vibe_response(target_date, vibe_data)
 
 
@@ -110,29 +128,33 @@ async def get_vibe_trend(
 ):
     """
     获取最近 N 天的 Vibing Index 趋势（以 end_date 为终点倒推 N 天）
-    
+
     优化：一次性查询整个日期范围的记录，内存中按日分组计算，避免 N+1 查询
     """
     if end_date:
         try:
             base_date = datetime.strptime(end_date, "%Y-%m-%d").date()
         except ValueError:
-            base_date = date.today()
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     else:
         base_date = date.today()
-    
+
     # 一次性查出整个日期范围的所有记录
     start_date = base_date - timedelta(days=days - 1)
     start_time = datetime.combine(start_date, datetime.min.time())
     end_time = datetime.combine(base_date + timedelta(days=1), datetime.min.time())
-    
-    all_records = db.query(LifeStream).filter(
-        and_(
-            LifeStream.created_at >= start_time,
-            LifeStream.created_at < end_time,
-        )
-    ).all()
-    
+
+    try:
+        all_records = db.query(LifeStream).filter(
+            and_(
+                LifeStream.created_at >= start_time,
+                LifeStream.created_at < end_time,
+            )
+        ).all()
+    except Exception as e:
+        logger.exception("查询趋势数据失败")
+        raise HTTPException(status_code=500, detail="查询数据失败，请稍后重试")
+
     # 按日期分组
     from collections import defaultdict
     records_by_date: dict[date, list] = defaultdict(list)
@@ -140,7 +162,7 @@ async def get_vibe_trend(
         record_date = r.created_at.date() if r.created_at else None
         if record_date:
             records_by_date[record_date].append(r)
-    
+
     # 批量计算每天的 vibe score（纯内存计算，无额外 DB 查询）
     calculator = VibeCalculator(db)
     trend = []
@@ -150,9 +172,13 @@ async def get_vibe_trend(
         if not day_records:
             trend.append(TrendDataPoint(date=target_date, vibe_score=None))
             continue
-        vibe_score = calculator.calculate_vibe_from_records(day_records)
+        try:
+            vibe_score = calculator.calculate_vibe_from_records(day_records)
+        except Exception as e:
+            logger.exception(f"计算 {target_date} 的 vibe score 失败")
+            vibe_score = None
         trend.append(TrendDataPoint(date=target_date, vibe_score=vibe_score))
-    
+
     # 按日期正序返回
     trend.reverse()
     return trend
@@ -165,7 +191,7 @@ async def get_correlations(
 ):
     """
     获取指定日期的关联分析
-    
+
     分析当天的行为与状态之间的关联，例如：
     - 咖啡因摄入 vs 睡眠质量
     - 屏幕时间 vs 入睡时间
@@ -174,24 +200,27 @@ async def get_correlations(
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="日期格式错误")
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     else:
         target_date = date.today()
-    
+
     # 获取当天所有记录
     start_time = datetime.combine(target_date, datetime.min.time())
     end_time = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
-    
-    records = db.query(LifeStream).filter(
-        and_(
-            LifeStream.created_at >= start_time,
-            LifeStream.created_at < end_time
-        )
-    ).all()
-    
+
+    try:
+        records = db.query(LifeStream).filter(
+            and_(
+                LifeStream.created_at >= start_time,
+                LifeStream.created_at < end_time
+            )
+        ).all()
+    except Exception as e:
+        logger.exception("查询关联分析数据失败")
+        raise HTTPException(status_code=500, detail="查询数据失败，请稍后重试")
+
     correlations = []
-    
+
     def _matches_category(r, cat: str) -> bool:
         """检查记录是否匹配分类（主分类或副分类）"""
         if r.category == cat:
@@ -199,61 +228,61 @@ async def get_correlations(
         if r.sub_categories and cat in r.sub_categories:
             return True
         return False
-    
+
     # 分析咖啡因摄入
     diet_records = [r for r in records if _matches_category(r, "DIET")]
     total_caffeine = 0
     late_caffeine = False
-    
+
     for r in diet_records:
         if r.meta_data:
             caffeine = r.meta_data.get("caffeine_mg") or r.meta_data.get("caffeine") or 0
             total_caffeine += float(caffeine)
-            
+
             # 检查是否下午2点后摄入咖啡因
             if r.created_at and r.created_at.hour >= 14 and caffeine > 0:
                 late_caffeine = True
-    
+
     if total_caffeine > 0:
         correlation = "positive" if total_caffeine < 200 else "negative"
         description = f"今日咖啡因摄入: {total_caffeine}mg"
         if late_caffeine:
             description += " (下午2点后有摄入，可能影响睡眠)"
             correlation = "negative"
-        
+
         correlations.append(CorrelationResult(
             factor="咖啡因",
             correlation=correlation,
             description=description,
             data={"total_mg": total_caffeine, "late_intake": late_caffeine}
         ))
-    
+
     # 分析屏幕时间
     screen_records = [r for r in records if _matches_category(r, "SCREEN")]
     total_screen_hours = 0
-    
+
     for r in screen_records:
         if r.meta_data:
             hours = r.meta_data.get("screen_hours") or r.meta_data.get("screen_time") or 0
             total_screen_hours += float(hours)
-    
+
     if total_screen_hours > 0:
         correlation = "positive" if total_screen_hours < 4 else "negative"
         description = f"今日屏幕时间: {total_screen_hours:.1f}小时"
         if total_screen_hours > 6:
             description += " (超过推荐值，注意用眼健康)"
-        
+
         correlations.append(CorrelationResult(
             factor="屏幕时间",
             correlation=correlation,
             description=description,
             data={"total_hours": total_screen_hours}
         ))
-    
+
     # 分析活动量
     activity_records = [r for r in records if _matches_category(r, "ACTIVITY")]
     activity_count = len(activity_records)
-    
+
     if activity_count > 0:
         correlations.append(CorrelationResult(
             factor="运动活动",
@@ -268,7 +297,7 @@ async def get_correlations(
             description="今天还没有运动记录",
             data={"count": 0}
         ))
-    
+
     return correlations
 
 
@@ -284,14 +313,20 @@ async def recalculate_vibe(
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="日期格式错误")
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     else:
         target_date = date.today()
-    
+
     calculator = VibeCalculator(db)
-    summary = calculator.update_daily_summary(target_date)
-    
+    try:
+        summary = calculator.update_daily_summary(target_date)
+    except Exception as e:
+        logger.exception("重新计算 vibe 失败")
+        raise HTTPException(status_code=500, detail="计算失败，请稍后重试")
+
+    if summary is None:
+        raise HTTPException(status_code=500, detail="计算结果为空，请检查数据")
+
     return {
         "date": target_date.isoformat(),
         "vibe_score": summary.vibe_score,
@@ -328,7 +363,7 @@ async def get_today_dimensions(
         try:
             target_dt = datetime.strptime(date_param, "%Y-%m-%d")
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     analyzer = get_dimension_analyzer()
     return analyzer.get_daily_dimension_summary(target_dt)
 
@@ -343,7 +378,7 @@ async def get_today_radar(
         try:
             target_dt = datetime.strptime(date_param, "%Y-%m-%d")
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     analyzer = get_dimension_analyzer()
     return analyzer.get_dimension_radar_data(target_dt)
 
@@ -352,15 +387,14 @@ async def get_today_radar(
 async def get_radar_data(date_str: str):
     """
     获取指定日期的八维度雷达图数据
-    
+
     - **date_str**: 日期字符串，格式 YYYY-MM-DD
     """
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
-    
+
     analyzer = get_dimension_analyzer()
     return analyzer.get_dimension_radar_data(target_date)
 
@@ -369,14 +403,13 @@ async def get_radar_data(date_str: str):
 async def get_dimensions(date_str: str):
     """
     获取指定日期的八维度分析
-    
+
     - **date_str**: 日期字符串，格式 YYYY-MM-DD
     """
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
-    
+
     analyzer = get_dimension_analyzer()
     return analyzer.get_daily_dimension_summary(target_date)

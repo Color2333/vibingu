@@ -88,10 +88,10 @@ export default function PullToRefresh({ onRefresh, children, className = '' }: P
         >
           <div className={`flex items-center gap-2 text-sm text-indigo-400 ${isRefreshing ? 'animate-pulse' : ''}`}>
             <RefreshCw 
-              className={`w-5 h-5 transition-transform ${isRefreshing ? 'animate-spin' : ''}`}
+              className={`w-8 h-8 transition-transform ${isRefreshing ? 'animate-spin' : ''}`}
               style={{ transform: isRefreshing ? undefined : `rotate(${progress * 360}deg)`, opacity: progress }}
             />
-            <span className="text-xs">
+            <span className="text-sm">
               {isRefreshing ? '刷新中...' : progress >= 1 ? '释放刷新' : '下拉刷新'}
             </span>
           </div>
