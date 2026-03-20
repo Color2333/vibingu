@@ -601,7 +601,11 @@ class DataExtractor:
             )
             
             # 检查 finish_reason 和 token 用量
+            if not response.choices:
+                raise Exception(f"AI 返回空结果 (model={actual_model})")
             choice = response.choices[0]
+            if not hasattr(choice, 'finish_reason'):
+                raise Exception(f"AI 返回格式错误，缺少 finish_reason")
             finish_reason = choice.finish_reason
             usage = response.usage
             
